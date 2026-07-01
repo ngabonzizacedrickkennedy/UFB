@@ -2,28 +2,52 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { registerUser, type ApiError } from "@/lib/api";
+import { checkEmailDeliverable, registerUser, resendVerification, type ApiError } from "@/lib/api";
 
 export default function RegisterPage() {
-  const router = useRouter();
   const [form, setForm] = useState({ fullName: "", email: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
+  const [emailStatus, setEmailStatus] = useState<"idle" | "checking" | "ok" | "invalid">("idle");
+  const [submitted, setSubmitted] = useState(false);
+  const [resent, setResent] = useState(false);
 
   const update = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm({ ...form, [k]: e.target.value });
 
+  const checkEmail = async () => {
+    if (!form.email) {
+      setEmailStatus("idle");
+      return;
+    }
+    setEmailStatus("checking");
+    try {
+      const deliverable = await checkEmailDeliverable(form.email);
+      setEmailStatus(deliverable ? "ok" : "invalid");
+    } catch {
+      setEmailStatus("idle");
+    }
+  };
+
   const submit = async () => {
+    if (emailStatus === "invalid") return;
     setLoading(true);
     setError(null);
     try {
       await registerUser(form);
-      router.replace("/login");
+      setSubmitted(true);
     } catch (err) {
       setError(err as ApiError);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const resend = async () => {
+    try {
+      await resendVerification(form.email);
+    } finally {
+      setResent(true);
     }
   };
 
@@ -52,34 +76,58 @@ export default function RegisterPage() {
           <p className="text-gold-dark uppercase tracking-[4px] text-xs mb-3 font-semibold">
             Get started
           </p>
-          <h2 className="font-display text-3xl text-navy mb-8">Create your account</h2>
-
-          <div className="space-y-5">
-              <Field label="Full name" value={form.fullName} onChange={update("fullName")}
-                     error={error?.fields?.fullName} />
-              <Field label="Email" type="email" value={form.email} onChange={update("email")}
-                     error={error?.fields?.email} />
-              <Field label="Password" type="password" value={form.password} onChange={update("password")}
-                     error={error?.fields?.password} />
-
-              {error && !error.fields && (
-                <p className="text-sm text-red-700">{error.message}</p>
+          {submitted ? (
+            <div className="border border-line bg-white rounded-md p-6">
+              <h3 className="font-display text-xl text-navy mb-2">Check your email.</h3>
+              <p className="text-mute text-sm">
+                We&rsquo;ve sent a verification link to {form.email}. Confirm it to activate your account before signing in.
+              </p>
+              {resent ? (
+                <p className="text-sm text-mute mt-4">A new link is on its way.</p>
+              ) : (
+                <p className="text-sm text-mute mt-4">
+                  Didn&rsquo;t get it?{" "}
+                  <button type="button" onClick={resend} className="text-gold-dark font-semibold">Resend it</button>
+                </p>
               )}
-
-              <button
-                onClick={submit}
-                disabled={loading}
-                className="w-full bg-gold text-navy font-semibold tracking-wide py-3.5 rounded-sm
-                           transition hover:bg-navy hover:text-gold disabled:opacity-60"
-              >
-                {loading ? "Creating…" : "Create account"}
-              </button>
-
-              <p className="text-sm text-mute text-center">
-                Already have an account?{" "}
-                <a href="/login" className="text-gold-dark font-semibold">Log in</a>
+              <p className="text-sm text-mute text-center mt-6">
+                <Link href="/login" className="text-gold-dark font-semibold">Back to sign in</Link>
               </p>
             </div>
+          ) : (
+            <>
+              <h2 className="font-display text-3xl text-navy mb-8">Create your account</h2>
+
+              <div className="space-y-5">
+                  <Field label="Full name" value={form.fullName} onChange={update("fullName")}
+                         error={error?.fields?.fullName} />
+                  <Field label="Email" type="email" value={form.email} onChange={update("email")}
+                         onBlur={checkEmail}
+                         error={error?.fields?.email ?? (emailStatus === "invalid" ? "This email doesn't appear to exist." : undefined)}
+                         hint={emailStatus === "checking" ? "Checking…" : undefined} />
+                  <Field label="Password" type="password" value={form.password} onChange={update("password")}
+                         error={error?.fields?.password} />
+
+                  {error && !error.fields && (
+                    <p className="text-sm text-red-700">{error.message}</p>
+                  )}
+
+                  <button
+                    onClick={submit}
+                    disabled={loading}
+                    className="w-full bg-gold text-navy font-semibold tracking-wide py-3.5 rounded-sm
+                               transition hover:bg-navy hover:text-gold disabled:opacity-60"
+                  >
+                    {loading ? "Creating…" : "Create account"}
+                  </button>
+
+                  <p className="text-sm text-mute text-center">
+                    Already have an account?{" "}
+                    <a href="/login" className="text-gold-dark font-semibold">Log in</a>
+                  </p>
+                </div>
+            </>
+          )}
         </div>
       </section>
     </main>
@@ -87,13 +135,15 @@ export default function RegisterPage() {
 }
 
 function Field({
-  label, value, onChange, type = "text", error,
+  label, value, onChange, onBlur, type = "text", error, hint,
 }: {
   label: string;
   value: string;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onBlur?: () => void;
   type?: string;
   error?: string;
+  hint?: string;
 }) {
   const [show, setShow] = useState(false);
   const inputType = type === "password" ? (show ? "text" : "password") : type;
@@ -106,6 +156,7 @@ function Field({
           type={inputType}
           value={value}
           onChange={onChange}
+          onBlur={onBlur}
           className="w-full border border-line bg-white rounded-sm px-4 py-3 text-char
                      outline-none focus:border-gold pr-11"
         />
@@ -121,6 +172,7 @@ function Field({
         )}
       </div>
       {error && <p className="text-xs text-red-700 mt-1">{error}</p>}
+      {!error && hint && <p className="text-xs text-mute mt-1">{hint}</p>}
     </div>
   );
 }

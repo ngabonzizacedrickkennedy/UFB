@@ -3,16 +3,28 @@ package com.ufb.auth.user_management.service.impl;
 import com.ufb.auth.user_management.dto.AuthResponse;
 import com.ufb.auth.user_management.dto.LoginRequest;
 import com.ufb.auth.user_management.dto.RegisterRequest;
+import com.ufb.auth.user_management.dto.ResetPasswordRequest;
 import com.ufb.auth.user_management.dto.UserResponse;
 import com.ufb.auth.user_management.exception.AccountDisabledException;
 import com.ufb.auth.user_management.exception.EmailAlreadyExistsException;
-import com.ufb.auth.user_management.exception.InvalidCredentialsException;
+import com.ufb.auth.user_management.exception.EmailNotRegisteredException;
+import com.ufb.auth.user_management.exception.EmailNotVerifiedException;
+import com.ufb.auth.user_management.exception.InvalidEmailDomainException;
+import com.ufb.auth.user_management.exception.InvalidPasswordException;
+import com.ufb.auth.user_management.exception.InvalidVerificationException;
 import com.ufb.auth.user_management.dto.ClaimAccountRequest;
 import com.ufb.auth.user_management.dto.CreateAdminRequest;
+import com.ufb.auth.user_management.dto.VerifyEmailRequest;
+import com.ufb.auth.user_management.exception.InvalidResetException;
 import com.ufb.auth.user_management.exception.UserNotFoundException;
+import com.ufb.auth.user_management.validation.EmailDomainValidator;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import com.ufb.auth.user_management.exception.InvalidClaimException;
 import com.ufb.auth.user_management.exception.InvalidTokenException;
+import com.ufb.auth.user_management.security.AccountVerificationNotifier;
+import com.ufb.auth.user_management.security.OneTimeTokens;
+import com.ufb.auth.user_management.security.PasswordResetNotifier;
 import com.ufb.auth.user_management.security.TokenHasher;
 import java.time.Instant;
 import io.jsonwebtoken.Claims;
@@ -37,16 +49,32 @@ public class UserServiceImpl implements UserService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final UserEventPublisher eventPublisher;
+    private final PasswordResetNotifier passwordResetNotifier;
+    private final AccountVerificationNotifier accountVerificationNotifier;
+    private final EmailDomainValidator emailDomainValidator;
 
     @Value("${ufb.admin.email}")
     private String bootstrapAdminEmail;
 
+    @Value("${ufb.password-reset.expiry-hours}")
+    private long resetTokenExpiryHours;
+
+    @Value("${ufb.verification.expiry-hours}")
+    private long verificationTokenExpiryHours;
+
     @Override
     @Transactional
     public UserResponse register(RegisterRequest request) {
+        if (!emailDomainValidator.domainAcceptsMail(request.email())) {
+            throw new InvalidEmailDomainException();
+        }
         if (userRepository.existsByEmail(request.email())) {
             throw new EmailAlreadyExistsException(request.email());
         }
+
+        String rawToken = OneTimeTokens.generate();
+        Instant expiresAt = Instant.now().plus(verificationTokenExpiryHours, ChronoUnit.HOURS);
+
         User user = User.builder()
                 .email(request.email())
                 .fullName(request.fullName())
@@ -54,28 +82,37 @@ public class UserServiceImpl implements UserService {
                 .role(Role.USER)
                 .enabled(true)
                 .passwordSet(true)
+                .emailVerified(false)
+                .verificationTokenHash(TokenHasher.sha256(rawToken))
+                .verificationTokenExpiresAt(expiresAt)
                 .build();
         User saved = userRepository.save(user);
         eventPublisher.publishRegistered(saved);
+        accountVerificationNotifier.deliver(saved.getEmail(), rawToken, expiresAt);
         return toResponse(saved);
     }
 
     @Override
     @Transactional(readOnly = true)
     public AuthResponse login(LoginRequest request) {
-        User user = userRepository.findByEmail(request.email())
-                .orElseThrow(InvalidCredentialsException::new);
-
-        if (!user.isPasswordSet() || user.getPassword() == null) {
-            throw new InvalidCredentialsException();
+        if (!emailDomainValidator.domainAcceptsMail(request.email())) {
+            throw new InvalidEmailDomainException();
         }
+
+        User user = userRepository.findByEmail(request.email())
+                .orElseThrow(EmailNotRegisteredException::new);
 
         if (!user.isEnabled()) {
             throw new AccountDisabledException();
         }
 
-        if (!passwordEncoder.matches(request.password(), user.getPassword())) {
-            throw new InvalidCredentialsException();
+        if (!user.isPasswordSet() || user.getPassword() == null
+                || !passwordEncoder.matches(request.password(), user.getPassword())) {
+            throw new InvalidPasswordException();
+        }
+
+        if (!user.isEmailVerified()) {
+            throw new EmailNotVerifiedException();
         }
 
         return new AuthResponse(
@@ -139,6 +176,7 @@ public class UserServiceImpl implements UserService {
 
         user.setPassword(passwordEncoder.encode(request.newPassword()));
         user.setPasswordSet(true);
+        user.setEmailVerified(true);
         user.setClaimTokenHash(null);
         user.setClaimTokenExpiresAt(null);
         User saved = userRepository.save(user);
@@ -157,6 +195,110 @@ public class UserServiceImpl implements UserService {
         return userRepository.findByEmail(bootstrapAdminEmail)
                 .map(u -> !u.isPasswordSet())
                 .orElse(false);
+    }
+
+    @Override
+    @Transactional
+    public void forgotPassword(String email) {
+        userRepository.findByEmail(email).ifPresent(user -> {
+            if (!user.isPasswordSet() || !user.isEnabled()) {
+                return;
+            }
+
+            String rawToken = OneTimeTokens.generate();
+            Instant expiresAt = Instant.now().plus(resetTokenExpiryHours, ChronoUnit.HOURS);
+
+            user.setResetTokenHash(TokenHasher.sha256(rawToken));
+            user.setResetTokenExpiresAt(expiresAt);
+            userRepository.save(user);
+
+            passwordResetNotifier.deliver(user.getEmail(), rawToken, expiresAt);
+        });
+    }
+
+    @Override
+    @Transactional
+    public AuthResponse resetPassword(ResetPasswordRequest request) {
+        User user = userRepository.findByEmail(request.email())
+                .orElseThrow(InvalidResetException::new);
+
+        if (user.getResetTokenHash() == null || user.getResetTokenExpiresAt() == null) {
+            throw new InvalidResetException();
+        }
+
+        if (Instant.now().isAfter(user.getResetTokenExpiresAt())) {
+            throw new InvalidResetException();
+        }
+
+        String incomingHash = TokenHasher.sha256(request.resetToken());
+        if (!constantTimeEquals(incomingHash, user.getResetTokenHash())) {
+            throw new InvalidResetException();
+        }
+
+        user.setPassword(passwordEncoder.encode(request.newPassword()));
+        user.setResetTokenHash(null);
+        user.setResetTokenExpiresAt(null);
+        User saved = userRepository.save(user);
+
+        return new AuthResponse(
+                jwtService.generateAccessToken(saved),
+                jwtService.generateRefreshToken(saved),
+                toResponse(saved)
+        );
+    }
+
+    @Override
+    @Transactional
+    public AuthResponse verifyEmail(VerifyEmailRequest request) {
+        User user = userRepository.findByEmail(request.email())
+                .orElseThrow(InvalidVerificationException::new);
+
+        if (user.isEmailVerified()) {
+            throw new InvalidVerificationException();
+        }
+
+        if (user.getVerificationTokenHash() == null || user.getVerificationTokenExpiresAt() == null) {
+            throw new InvalidVerificationException();
+        }
+
+        if (Instant.now().isAfter(user.getVerificationTokenExpiresAt())) {
+            throw new InvalidVerificationException();
+        }
+
+        String incomingHash = TokenHasher.sha256(request.verificationToken());
+        if (!constantTimeEquals(incomingHash, user.getVerificationTokenHash())) {
+            throw new InvalidVerificationException();
+        }
+
+        user.setEmailVerified(true);
+        user.setVerificationTokenHash(null);
+        user.setVerificationTokenExpiresAt(null);
+        User saved = userRepository.save(user);
+
+        return new AuthResponse(
+                jwtService.generateAccessToken(saved),
+                jwtService.generateRefreshToken(saved),
+                toResponse(saved)
+        );
+    }
+
+    @Override
+    @Transactional
+    public void resendVerification(String email) {
+        userRepository.findByEmail(email).ifPresent(user -> {
+            if (user.isEmailVerified() || !user.isPasswordSet() || !user.isEnabled()) {
+                return;
+            }
+
+            String rawToken = OneTimeTokens.generate();
+            Instant expiresAt = Instant.now().plus(verificationTokenExpiryHours, ChronoUnit.HOURS);
+
+            user.setVerificationTokenHash(TokenHasher.sha256(rawToken));
+            user.setVerificationTokenExpiresAt(expiresAt);
+            userRepository.save(user);
+
+            accountVerificationNotifier.deliver(user.getEmail(), rawToken, expiresAt);
+        });
     }
 
     @Override
@@ -200,6 +342,7 @@ public class UserServiceImpl implements UserService {
                 .role(Role.ADMIN)
                 .enabled(true)
                 .passwordSet(true)
+                .emailVerified(true)
                 .build();
         User saved = userRepository.save(admin);
         eventPublisher.publishRegistered(saved);

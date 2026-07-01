@@ -2,6 +2,8 @@ export type RegisterRequest = { email: string; fullName: string; password: strin
 export type LoginRequest = { email: string; password: string };
 export type ClaimRequest = { email: string; claimToken: string; newPassword: string };
 export type CreateAdminRequest = { email: string; fullName: string; password: string };
+export type ResetPasswordRequest = { email: string; resetToken: string; newPassword: string };
+export type VerifyEmailRequest = { email: string; verificationToken: string };
 
 export type UserResponse = {
   id: number;
@@ -92,6 +94,32 @@ export async function claimAccount(body: ClaimRequest): Promise<AuthResponse> {
 
 export async function claimStatus(): Promise<ClaimStatusResponse> {
   return parse<ClaimStatusResponse>(await fetch("/api/auth/claim-status"));
+}
+
+export function forgotPassword(email: string): Promise<{ message: string }> {
+  return postPublic<{ message: string }>("/api/auth/forgot-password", { email });
+}
+
+export async function resetPassword(body: ResetPasswordRequest): Promise<AuthResponse> {
+  const auth = await postPublic<AuthResponse>("/api/auth/reset-password", body);
+  storeAuth(auth);
+  return auth;
+}
+
+export async function checkEmailDeliverable(email: string): Promise<boolean> {
+  const res = await fetch(`/api/auth/email-check?email=${encodeURIComponent(email)}`);
+  const data = await parse<{ deliverable: boolean }>(res);
+  return data.deliverable;
+}
+
+export async function verifyEmail(body: VerifyEmailRequest): Promise<AuthResponse> {
+  const auth = await postPublic<AuthResponse>("/api/auth/verify-email", body);
+  storeAuth(auth);
+  return auth;
+}
+
+export function resendVerification(email: string): Promise<{ message: string }> {
+  return postPublic<{ message: string }>("/api/auth/resend-verification", { email });
 }
 
 async function tryRefresh(): Promise<boolean> {

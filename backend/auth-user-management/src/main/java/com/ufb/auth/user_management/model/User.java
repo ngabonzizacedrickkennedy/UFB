@@ -46,6 +46,30 @@ public class User {
     @Column(name = "claim_token_expires_at")
     private Instant claimTokenExpiresAt;
 
+    // SHA-256 hash of the one-time password reset token; null unless a reset is in flight
+    @Column(name = "reset_token_hash")
+    private String resetTokenHash;
+
+    // When the reset token stops being valid; null unless a reset is in flight
+    @Column(name = "reset_token_expires_at")
+    private Instant resetTokenExpiresAt;
+
+    // True once the account owner has confirmed they control this mailbox.
+    // Self-registered users start false; claimed/admin-created accounts start true
+    // because receiving and using a claim token already proves mailbox ownership.
+    // DB default is true so this migration doesn't retroactively lock out accounts
+    // that already existed (and could already log in) before this column was added.
+    @Column(name = "email_verified", nullable = false, columnDefinition = "boolean not null default true")
+    private boolean emailVerified;
+
+    // SHA-256 hash of the one-time email verification token; null once verified
+    @Column(name = "verification_token_hash")
+    private String verificationTokenHash;
+
+    // When the verification token stops being valid; null once verified
+    @Column(name = "verification_token_expires_at")
+    private Instant verificationTokenExpiresAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

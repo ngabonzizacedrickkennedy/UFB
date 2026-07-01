@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { loginUser, type ApiError, type AuthResponse } from "@/lib/api";
+import { checkEmailDeliverable, loginUser, resendVerification, type ApiError, type AuthResponse } from "@/lib/api";
 
 export default function LoginPage() {
   const [form, setForm] = useState({ email: "", password: "" });
@@ -11,14 +11,32 @@ export default function LoginPage() {
   const [error, setError] = useState<ApiError | null>(null);
   const [auth, setAuth] = useState<AuthResponse | null>(null);
   const [showPw, setShowPw] = useState(false);
+  const [emailStatus, setEmailStatus] = useState<"idle" | "checking" | "ok" | "invalid">("idle");
+  const [resent, setResent] = useState(false);
   const router = useRouter();
 
   const update = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm({ ...form, [k]: e.target.value });
 
+  const checkEmail = async () => {
+    if (!form.email) {
+      setEmailStatus("idle");
+      return;
+    }
+    setEmailStatus("checking");
+    try {
+      const deliverable = await checkEmailDeliverable(form.email);
+      setEmailStatus(deliverable ? "ok" : "invalid");
+    } catch {
+      setEmailStatus("idle");
+    }
+  };
+
   const submit = async () => {
+    if (emailStatus === "invalid") return;
     setLoading(true);
     setError(null);
+    setResent(false);
     try {
       const auth = await loginUser(form);
       setAuth(auth);
@@ -29,6 +47,19 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+
+  const resend = async () => {
+    try {
+      await resendVerification(form.email);
+    } finally {
+      setResent(true);
+    }
+  };
+
+  const emailError = emailStatus === "invalid"
+    ? "This email doesn't appear to exist."
+    : error?.fields?.email;
+  const passwordError = error?.fields?.password;
 
   return (
     <main className="min-h-screen grid lg:grid-cols-2">
@@ -64,11 +95,17 @@ export default function LoginPage() {
                   type="email"
                   value={form.email}
                   onChange={update("email")}
+                  onBlur={checkEmail}
                   className="w-full border border-line bg-white rounded-sm px-4 py-3 text-char outline-none focus:border-gold"
                 />
+                {emailError && <p className="text-xs text-red-700 mt-1">{emailError}</p>}
+                {!emailError && emailStatus === "checking" && <p className="text-xs text-mute mt-1">Checking…</p>}
               </div>
               <div>
-                <label className="block text-xs uppercase tracking-wide text-mute mb-2">Password</label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs uppercase tracking-wide text-mute">Password</label>
+                  <Link href="/forgot-password" className="text-xs text-gold-dark font-semibold">Forgot password?</Link>
+                </div>
                 <div className="relative">
                   <input
                     type={showPw ? "text" : "password"}
@@ -85,9 +122,20 @@ export default function LoginPage() {
                     {showPw ? <EyeOff /> : <Eye />}
                   </button>
                 </div>
+                {passwordError && <p className="text-xs text-red-700 mt-1">{passwordError}</p>}
               </div>
 
-              {error && <p className="text-sm text-red-700">{error.message}</p>}
+              {error && !error.fields && <p className="text-sm text-red-700">{error.message}</p>}
+
+              {error?.status === 403 && (
+                resent ? (
+                  <p className="text-sm text-mute">A new verification link is on its way.</p>
+                ) : (
+                  <p className="text-sm text-mute">
+                    <button type="button" onClick={resend} className="text-gold-dark font-semibold">Resend verification email</button>
+                  </p>
+                )
+              )}
 
               <button
                 onClick={submit}

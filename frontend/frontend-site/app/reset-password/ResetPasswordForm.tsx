@@ -1,0 +1,177 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { resetPassword, type ApiError } from "@/lib/api";
+
+export default function ResetPasswordForm() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [form, setForm] = useState({
+    email: searchParams.get("email") ?? "",
+    resetToken: searchParams.get("token") ?? "",
+    newPassword: "",
+  });
+  const [confirm, setConfirm] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<ApiError | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  const update = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm({ ...form, [k]: e.target.value });
+
+  const submit = async () => {
+    setError(null);
+    setLocalError(null);
+
+    if (form.newPassword.length < 8) {
+      setLocalError("Password must be at least 8 characters.");
+      return;
+    }
+    if (form.newPassword !== confirm) {
+      setLocalError("Passwords do not match.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const auth = await resetPassword(form);
+      router.push(auth.user.role === "ADMIN" ? "/admin" : "/portal");
+    } catch (err) {
+      setError(err as ApiError);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <main className="min-h-screen grid lg:grid-cols-2">
+      <section className="hidden lg:flex flex-col justify-between bg-navy text-white p-14">
+        <Link href="/" className="font-display text-2xl text-gold tracking-wide">UFB</Link>
+        <div>
+          <p className="text-gold uppercase tracking-[5px] text-xs mb-6">Unified Finance Bridge</p>
+          <h1 className="font-display text-4xl leading-tight mb-5">
+            Set a new <span className="text-gold">password</span>.
+          </h1>
+          <p className="text-[#c7d0de] font-light max-w-sm">
+            Use the one-time token from your email to set a new password. This link is single-use and expires.
+          </p>
+        </div>
+        <p className="font-display italic text-[#c7d0de] text-sm">Where Capital Meets Expertise</p>
+      </section>
+
+      <section className="flex items-center justify-center bg-ivory p-8">
+        <div className="w-full max-w-md">
+          <p className="text-gold-dark uppercase tracking-[4px] text-xs mb-3 font-semibold">Reset password</p>
+          <h2 className="font-display text-3xl text-navy mb-8">Choose a new password</h2>
+
+          <div className="space-y-5">
+            <div>
+              <label className="block text-xs uppercase tracking-wide text-mute mb-2">Email</label>
+              <input
+                type="email"
+                value={form.email}
+                onChange={update("email")}
+                className="w-full border border-line bg-white rounded-sm px-4 py-3 text-char outline-none focus:border-gold"
+              />
+              {error?.fields?.email && <p className="text-xs text-red-700 mt-1">{error.fields.email}</p>}
+            </div>
+
+            <div>
+              <label className="block text-xs uppercase tracking-wide text-mute mb-2">Reset token</label>
+              <input
+                type="text"
+                value={form.resetToken}
+                onChange={update("resetToken")}
+                placeholder="Paste the one-time token"
+                className="w-full border border-line bg-white rounded-sm px-4 py-3 text-char outline-none focus:border-gold font-mono text-sm"
+              />
+              {error?.fields?.resetToken && <p className="text-xs text-red-700 mt-1">{error.fields.resetToken}</p>}
+            </div>
+
+            <div>
+              <label className="block text-xs uppercase tracking-wide text-mute mb-2">New password</label>
+              <div className="relative">
+                <input
+                  type={showNew ? "text" : "password"}
+                  value={form.newPassword}
+                  onChange={update("newPassword")}
+                  className="w-full border border-line bg-white rounded-sm px-4 py-3 text-char outline-none focus:border-gold pr-11"
+                />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => setShowNew((s) => !s)}
+                  className="absolute inset-y-0 right-3 flex items-center text-mute hover:text-char"
+                >
+                  {showNew ? <EyeOff /> : <Eye />}
+                </button>
+              </div>
+              {error?.fields?.newPassword && <p className="text-xs text-red-700 mt-1">{error.fields.newPassword}</p>}
+            </div>
+
+            <div>
+              <label className="block text-xs uppercase tracking-wide text-mute mb-2">Confirm password</label>
+              <div className="relative">
+                <input
+                  type={showConfirm ? "text" : "password"}
+                  value={confirm}
+                  onChange={(e) => setConfirm(e.target.value)}
+                  className="w-full border border-line bg-white rounded-sm px-4 py-3 text-char outline-none focus:border-gold pr-11"
+                />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => setShowConfirm((s) => !s)}
+                  className="absolute inset-y-0 right-3 flex items-center text-mute hover:text-char"
+                >
+                  {showConfirm ? <EyeOff /> : <Eye />}
+                </button>
+              </div>
+            </div>
+
+            {localError && <p className="text-sm text-red-700">{localError}</p>}
+            {error && !error.fields && <p className="text-sm text-red-700">{error.message}</p>}
+
+            <button
+              onClick={submit}
+              disabled={loading}
+              className="w-full bg-gold text-navy font-semibold tracking-wide py-3.5 rounded-sm transition hover:bg-navy hover:text-gold disabled:opacity-60"
+            >
+              {loading ? "Resetting…" : "Reset password"}
+            </button>
+
+            <p className="text-sm text-mute text-center">
+              Remembered it?{" "}
+              <Link href="/login" className="text-gold-dark font-semibold">Sign in</Link>
+            </p>
+          </div>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function Eye() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+         fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
+      <circle cx="12" cy="12" r="3"/>
+    </svg>
+  );
+}
+
+function EyeOff() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+         fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+      <line x1="1" y1="1" x2="23" y2="23"/>
+    </svg>
+  );
+}
