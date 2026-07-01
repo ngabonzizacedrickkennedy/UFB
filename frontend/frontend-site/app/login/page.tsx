@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { loginUser, type ApiError, type AuthResponse } from "@/lib/api";
 
 export default function LoginPage() {
@@ -8,6 +9,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
   const [auth, setAuth] = useState<AuthResponse | null>(null);
+  const router = useRouter();
 
   const update = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm({ ...form, [k]: e.target.value });
@@ -16,7 +18,9 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
     try {
-      setAuth(await loginUser(form));
+      const auth = await loginUser(form);
+      setAuth(auth);
+      router.replace(auth.user.role === "ADMIN" ? "/admin" : "/portal");
     } catch (err) {
       setError(err as ApiError);
     } finally {

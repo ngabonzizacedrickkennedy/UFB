@@ -1,5 +1,7 @@
 export type RegisterRequest = { email: string; fullName: string; password: string };
 export type LoginRequest = { email: string; password: string };
+export type ClaimRequest = { email: string; claimToken: string; newPassword: string };
+export type CreateAdminRequest = { email: string; fullName: string; password: string };
 
 export type UserResponse = {
   id: number;
@@ -18,39 +20,126 @@ export type AuthResponse = {
 
 export type ApiError = { status: number; message: string; fields?: Record<string, string> };
 
-async function post<T>(path: string, body: unknown): Promise<T> {
+const ACCESS_KEY = "ufb_access";
+const REFRESH_KEY = "ufb_refresh";
+const USER_KEY = "ufb_user";
+
+function getAccess(): string | null {
+  return typeof window === "undefined" ? null : localStorage.getItem(ACCESS_KEY);
+}
+function getRefresh(): string | null {
+  return typeof window === "undefined" ? null : localStorage.getItem(REFRESH_KEY);
+}
+function storeAuth(auth: AuthResponse) {
+  localStorage.setItem(ACCESS_KEY, auth.accessToken);
+  localStorage.setItem(REFRESH_KEY, auth.refreshToken);
+  localStorage.setItem(USER_KEY, JSON.stringify(auth.user));
+}
+
+export function logout() {
+  localStorage.removeItem(ACCESS_KEY);
+  localStorage.removeItem(REFRESH_KEY);
+  localStorage.removeItem(USER_KEY);
+}
+
+export function currentUser(): UserResponse | null {
+  if (typeof window === "undefined") return null;
+  const raw = localStorage.getItem(USER_KEY);
+  return raw ? (JSON.parse(raw) as UserResponse) : null;
+}
+
+export function isLoggedIn(): boolean {
+  return !!getAccess();
+}
+
+async function parse<T>(res: Response): Promise<T> {
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw {
+      status: res.status,
+      message: (data as ApiError).message ?? "Request failed",
+      fields: (data as ApiError).fields,
+    } as ApiError;
+  }
+  return data as T;
+}
+
+async function postPublic<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw { status: res.status, message: data.message ?? "Request failed", fields: data.fields } as ApiError;
-  }
-  return data as T;
+  return parse<T>(res);
 }
 
 export function registerUser(body: RegisterRequest): Promise<UserResponse> {
-  return post<UserResponse>("/api/auth/register", body);
+  return postPublic<UserResponse>("/api/auth/register", body);
 }
 
 export async function loginUser(body: LoginRequest): Promise<AuthResponse> {
-  const auth = await post<AuthResponse>("/api/auth/login", body);
-  localStorage.setItem("ufb_access", auth.accessToken);
-  localStorage.setItem("ufb_refresh", auth.refreshToken);
-  localStorage.setItem("ufb_user", JSON.stringify(auth.user));
+  const auth = await postPublic<AuthResponse>("/api/auth/login", body);
+  storeAuth(auth);
   return auth;
 }
 
-export function logout() {
-  localStorage.removeItem("ufb_access");
-  localStorage.removeItem("ufb_refresh");
-  localStorage.removeItem("ufb_user");
+export async function claimAccount(body: ClaimRequest): Promise<AuthResponse> {
+  const auth = await postPublic<AuthResponse>("/api/auth/claim", body);
+  storeAuth(auth);
+  return auth;
 }
 
-export function currentUser(): UserResponse | null {
-  if (typeof window === "undefined") return null;
-  const raw = localStorage.getItem("ufb_user");
-  return raw ? (JSON.parse(raw) as UserResponse) : null;
+async function tryRefresh(): Promise<boolean> {
+  const refreshToken = getRefresh();
+  if (!refreshToken) return false;
+  try {
+    const auth = await postPublic<AuthResponse>("/api/auth/refresh", { refreshToken });
+    storeAuth(auth);
+    return true;
+  } catch {
+    logout();
+    return false;
+  }
+}
+
+async function authFetch(path: string, init: RequestInit, retry = true): Promise<Response> {
+  const token = getAccess();
+  const headers = new Headers(init.headers);
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  if (init.body) headers.set("Content-Type", "application/json");
+
+  const res = await fetch(path, { ...init, headers });
+
+  if (res.status === 401 && retry) {
+    const refreshed = await tryRefresh();
+    if (refreshed) return authFetch(path, init, false);
+  }
+  return res;
+}
+
+async function authGet<T>(path: string): Promise<T> {
+  return parse<T>(await authFetch(path, { method: "GET" }));
+}
+async function authSend<T>(path: string, method: string, body?: unknown): Promise<T> {
+  return parse<T>(
+    await authFetch(path, { method, body: body ? JSON.stringify(body) : undefined })
+  );
+}
+
+export function listUsers(): Promise<UserResponse[]> {
+  return authGet<UserResponse[]>("/api/admin/users");
+}
+export function disableUser(id: number): Promise<UserResponse> {
+  return authSend<UserResponse>(`/api/admin/users/${id}/disable`, "PATCH");
+}
+export function enableUser(id: number): Promise<UserResponse> {
+  return authSend<UserResponse>(`/api/admin/users/${id}/enable`, "PATCH");
+}
+export function deleteUser(id: number): Promise<void> {
+  return authFetch(`/api/admin/users/${id}`, { method: "DELETE" }).then((res) => {
+    if (!res.ok && res.status !== 204) throw { status: res.status, message: "Delete failed" } as ApiError;
+  });
+}
+export function createAdmin(body: CreateAdminRequest): Promise<UserResponse> {
+  return authSend<UserResponse>("/api/admin/admins", "POST", body);
 }

@@ -1,0 +1,132 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { claimAccount, type ApiError } from "@/lib/api";
+
+export default function ClaimPage() {
+  const router = useRouter();
+  const [form, setForm] = useState({ email: "", claimToken: "", newPassword: "" });
+  const [confirm, setConfirm] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<ApiError | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  const update = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm({ ...form, [k]: e.target.value });
+
+  const submit = async () => {
+    setError(null);
+    setLocalError(null);
+
+    if (form.newPassword.length < 8) {
+      setLocalError("Password must be at least 8 characters.");
+      return;
+    }
+    if (form.newPassword !== confirm) {
+      setLocalError("Passwords do not match.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const auth = await claimAccount(form);
+      if (auth.user.role === "ADMIN") {
+        router.push("/admin");
+      } else {
+        router.push("/portal");
+      }
+    } catch (err) {
+      setError(err as ApiError);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <main className="min-h-screen grid lg:grid-cols-2">
+      <section className="hidden lg:flex flex-col justify-between bg-navy text-white p-14">
+        <span className="font-display text-2xl text-gold tracking-wide">UFB</span>
+        <div>
+          <p className="text-gold uppercase tracking-[5px] text-xs mb-6">Unified Finance Bridge</p>
+          <h1 className="font-display text-4xl leading-tight mb-5">
+            Claim your <span className="text-gold">account</span>.
+          </h1>
+          <p className="text-[#c7d0de] font-light max-w-sm">
+            Set your password using the one-time token issued to your account. This link is single-use and expires.
+          </p>
+        </div>
+        <p className="font-display italic text-[#c7d0de] text-sm">Where Capital Meets Expertise</p>
+      </section>
+
+      <section className="flex items-center justify-center bg-ivory p-8">
+        <div className="w-full max-w-md">
+          <p className="text-gold-dark uppercase tracking-[4px] text-xs mb-3 font-semibold">Activate access</p>
+          <h2 className="font-display text-3xl text-navy mb-8">Set your password</h2>
+
+          <div className="space-y-5">
+            <div>
+              <label className="block text-xs uppercase tracking-wide text-mute mb-2">Email</label>
+              <input
+                type="email"
+                value={form.email}
+                onChange={update("email")}
+                className="w-full border border-line bg-white rounded-sm px-4 py-3 text-char outline-none focus:border-gold"
+              />
+              {error?.fields?.email && <p className="text-xs text-red-700 mt-1">{error.fields.email}</p>}
+            </div>
+
+            <div>
+              <label className="block text-xs uppercase tracking-wide text-mute mb-2">Claim token</label>
+              <input
+                type="text"
+                value={form.claimToken}
+                onChange={update("claimToken")}
+                placeholder="Paste the one-time token"
+                className="w-full border border-line bg-white rounded-sm px-4 py-3 text-char outline-none focus:border-gold font-mono text-sm"
+              />
+              {error?.fields?.claimToken && <p className="text-xs text-red-700 mt-1">{error.fields.claimToken}</p>}
+            </div>
+
+            <div>
+              <label className="block text-xs uppercase tracking-wide text-mute mb-2">New password</label>
+              <input
+                type="password"
+                value={form.newPassword}
+                onChange={update("newPassword")}
+                className="w-full border border-line bg-white rounded-sm px-4 py-3 text-char outline-none focus:border-gold"
+              />
+              {error?.fields?.newPassword && <p className="text-xs text-red-700 mt-1">{error.fields.newPassword}</p>}
+            </div>
+
+            <div>
+              <label className="block text-xs uppercase tracking-wide text-mute mb-2">Confirm password</label>
+              <input
+                type="password"
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                className="w-full border border-line bg-white rounded-sm px-4 py-3 text-char outline-none focus:border-gold"
+              />
+            </div>
+
+            {localError && <p className="text-sm text-red-700">{localError}</p>}
+            {error && !error.fields && <p className="text-sm text-red-700">{error.message}</p>}
+
+            <button
+              onClick={submit}
+              disabled={loading}
+              className="w-full bg-gold text-navy font-semibold tracking-wide py-3.5 rounded-sm transition hover:bg-navy hover:text-gold disabled:opacity-60"
+            >
+              {loading ? "Activating…" : "Claim account"}
+            </button>
+
+            <p className="text-sm text-mute text-center">
+              Already activated?{" "}
+              <a href="/login" className="text-gold-dark font-semibold">Sign in</a>
+            </p>
+          </div>
+        </div>
+      </section>
+    </main>
+  );
+}
