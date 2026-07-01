@@ -2,6 +2,7 @@ package com.ufb.auth.user_management.controller;
 
 import com.ufb.auth.user_management.dto.AuthResponse;
 import com.ufb.auth.user_management.dto.LoginRequest;
+import com.ufb.auth.user_management.dto.RefreshRequest;
 import com.ufb.auth.user_management.dto.RegisterRequest;
 import com.ufb.auth.user_management.dto.UserResponse;
 import com.ufb.auth.user_management.service.UserService;
@@ -26,5 +27,10 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         return ResponseEntity.ok(userService.login(request));
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshRequest request) {
+        return ResponseEntity.ok(userService.refresh(request.refreshToken()));
     }
 }

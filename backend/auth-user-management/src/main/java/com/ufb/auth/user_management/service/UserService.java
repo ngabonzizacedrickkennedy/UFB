@@ -8,4 +8,5 @@ import com.ufb.auth.user_management.dto.UserResponse;
 public interface UserService {
     UserResponse register(RegisterRequest request);
     AuthResponse login(LoginRequest request);
+    AuthResponse refresh(String refreshToken);
 }

@@ -20,7 +20,8 @@ public class User {
     @Column(nullable = false, unique = true)
     private String email;
 
-    @Column(nullable = false)
+    // Nullable: a seeded-but-unclaimed admin has no password until they claim the account
+    @Column(nullable = true)
     private String password;
 
     @Column(name = "full_name", nullable = false)
@@ -32,6 +33,18 @@ public class User {
 
     @Column(nullable = false)
     private boolean enabled;
+
+    // False until the account owner has set their own password (true for normal signups)
+    @Column(name = "password_set", nullable = false)
+    private boolean passwordSet;
+
+    // SHA-256 hash of the one-time claim token; null once claimed or for normal users
+    @Column(name = "claim_token_hash")
+    private String claimTokenHash;
+
+    // When the claim token stops being valid; null once claimed or for normal users
+    @Column(name = "claim_token_expires_at")
+    private Instant claimTokenExpiresAt;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
