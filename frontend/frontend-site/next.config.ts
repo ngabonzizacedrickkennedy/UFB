@@ -5,11 +5,11 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/api/auth/:path*",
-        destination: "http://localhost:8080/api/auth/:path*",
+        destination: "http://localhost:8081/api/auth/:path*",
       },
       {
         source: "/api/admin/:path*",
-        destination: "http://localhost:8080/api/admin/:path*",
+        destination: "http://localhost:8081/api/admin/:path*",
       },
     ];
   },

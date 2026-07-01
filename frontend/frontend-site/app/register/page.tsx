@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { registerUser, type ApiError } from "@/lib/api";
 
@@ -29,7 +30,7 @@ export default function RegisterPage() {
   return (
     <main className="min-h-screen grid lg:grid-cols-2">
       <section className="hidden lg:flex flex-col justify-between bg-navy text-white p-14">
-        <span className="font-display text-2xl text-gold tracking-wide">UFB</span>
+        <Link href="/" className="font-display text-2xl text-gold tracking-wide">UFB</Link>
         <div>
           <p className="text-gold uppercase tracking-[5px] text-xs mb-6">
             Unified Finance Bridge

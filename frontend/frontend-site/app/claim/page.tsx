@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { claimAccount, currentUser, isLoggedIn, type ApiError } from "@/lib/api";
 
@@ -69,7 +70,7 @@ export default function ClaimPage() {
   return (
     <main className="min-h-screen grid lg:grid-cols-2">
       <section className="hidden lg:flex flex-col justify-between bg-navy text-white p-14">
-        <span className="font-display text-2xl text-gold tracking-wide">UFB</span>
+        <Link href="/" className="font-display text-2xl text-gold tracking-wide">UFB</Link>
         <div>
           <p className="text-gold uppercase tracking-[5px] text-xs mb-6">Unified Finance Bridge</p>
           <h1 className="font-display text-4xl leading-tight mb-5">
