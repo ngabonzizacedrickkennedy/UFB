@@ -3,14 +3,14 @@ package com.ufb.consultation_service.event;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.ufb.consultation_service.config.RabbitMQConfig;
 import com.ufb.consultation_service.model.Business;
 import com.ufb.consultation_service.model.Consultation;
 import com.ufb.consultation_service.model.Stage;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -22,19 +22,7 @@ public class ConsultationEventPublisher {
     private static final Logger log = LoggerFactory.getLogger(ConsultationEventPublisher.class);
     private static final ObjectMapper MAPPER = new ObjectMapper().registerModule(new JavaTimeModule());
 
-    private final KafkaTemplate<String, String> kafkaTemplate;
-
-    @Value("${ufb.kafka.topic.business-described}")
-    private String businessDescribedTopic;
-
-    @Value("${ufb.kafka.topic.consultation-requested}")
-    private String consultationRequestedTopic;
-
-    @Value("${ufb.kafka.topic.consultation-completed}")
-    private String consultationCompletedTopic;
-
-    @Value("${ufb.kafka.topic.business-stage-changed}")
-    private String businessStageChangedTopic;
+    private final RabbitTemplate rabbitTemplate;
 
     public void publishBusinessDescribed(Business business) {
         BusinessDescribedEvent event = new BusinessDescribedEvent(
@@ -46,7 +34,7 @@ public class ConsultationEventPublisher {
                 business.getStage(),
                 Instant.now()
         );
-        publish(businessDescribedTopic, "business.described", business.getId(), event);
+        publish("business.described", business.getId(), event);
     }
 
     public void publishConsultationRequested(Consultation consultation) {
@@ -57,7 +45,7 @@ public class ConsultationEventPublisher {
                 consultation.getBusiness().getOwnerEmail(),
                 Instant.now()
         );
-        publish(consultationRequestedTopic, "consultation.requested", consultation.getBusiness().getId(), event);
+        publish("consultation.requested", consultation.getBusiness().getId(), event);
     }
 
     public void publishConsultationCompleted(Consultation consultation, String adminEmail) {
@@ -69,7 +57,7 @@ public class ConsultationEventPublisher {
                 adminEmail,
                 Instant.now()
         );
-        publish(consultationCompletedTopic, "consultation.completed", consultation.getBusiness().getId(), event);
+        publish("consultation.completed", consultation.getBusiness().getId(), event);
     }
 
     public void publishBusinessStageChanged(Business business, Stage oldStage, Stage newStage) {
@@ -82,18 +70,18 @@ public class ConsultationEventPublisher {
                 newStage,
                 Instant.now()
         );
-        publish(businessStageChangedTopic, "business.stage.changed", business.getId(), event);
+        publish("business.stage.changed", business.getId(), event);
     }
 
-    private void publish(String topic, String eventType, Long businessId, Object event) {
+    private void publish(String routingKey, Long businessId, Object event) {
         try {
             String payload = MAPPER.writeValueAsString(event);
-            kafkaTemplate.send(topic, String.valueOf(businessId), payload);
-            log.info("Published {} for businessId={}", eventType, businessId);
+            rabbitTemplate.convertAndSend(RabbitMQConfig.EXCHANGE, routingKey, payload);
+            log.info("Published {} for businessId={}", routingKey, businessId);
         } catch (JsonProcessingException ex) {
-            log.error("Failed to serialize {} for businessId={}: {}", eventType, businessId, ex.getMessage());
+            log.error("Failed to serialize {} for businessId={}: {}", routingKey, businessId, ex.getMessage());
         } catch (Exception ex) {
-            log.error("Failed to publish {} for businessId={}: {}", eventType, businessId, ex.getMessage());
+            log.error("Failed to publish {} for businessId={}: {}", routingKey, businessId, ex.getMessage());
         }
     }
 }
