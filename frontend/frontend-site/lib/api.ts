@@ -193,3 +193,97 @@ export function deleteUser(id: number): Promise<void> {
 export function createAdmin(body: CreateAdminRequest): Promise<UserResponse> {
   return authSend<UserResponse>("/api/admin/admins", "POST", body);
 }
+
+// ---- consultation-service ----
+
+export type Sector = "RETAIL" | "TECHNOLOGY" | "AGRICULTURE" | "MANUFACTURING" | "FINANCE"
+  | "HEALTHCARE" | "EDUCATION" | "HOSPITALITY" | "CONSTRUCTION" | "TRANSPORTATION"
+  | "PROFESSIONAL_SERVICES" | "OTHER";
+export type Stage = "STARTUP" | "ONGOING" | "SCALING";
+export type ConsultationStatus = "PENDING" | "IN_REVIEW" | "ADVISED";
+
+export const SECTORS: Sector[] = [
+  "RETAIL", "TECHNOLOGY", "AGRICULTURE", "MANUFACTURING", "FINANCE",
+  "HEALTHCARE", "EDUCATION", "HOSPITALITY", "CONSTRUCTION", "TRANSPORTATION",
+  "PROFESSIONAL_SERVICES", "OTHER",
+];
+export const STAGES: Stage[] = ["STARTUP", "ONGOING", "SCALING"];
+
+export type ConsultationSummary = { id: number; status: ConsultationStatus };
+
+export type BusinessResponse = {
+  id: number;
+  ownerEmail: string;
+  name: string;
+  sector: Sector;
+  stage: Stage;
+  description: string;
+  needs: string | null;
+  consultation: ConsultationSummary | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type BusinessCreateRequest = {
+  name: string;
+  sector: Sector;
+  stage: Stage;
+  description: string;
+  needs?: string;
+};
+
+export type ConsultationMessageResponse = {
+  id: number;
+  authorEmail: string;
+  authorRole: "USER" | "ADMIN";
+  body: string;
+  createdAt: string;
+};
+
+export type PageResponse<T> = {
+  content: T[];
+  totalElements: number;
+  totalPages: number;
+  number: number;
+  size: number;
+};
+
+export function listMyBusinesses(): Promise<BusinessResponse[]> {
+  return authGet<BusinessResponse[]>("/api/consultation/businesses");
+}
+export function createBusiness(body: BusinessCreateRequest): Promise<BusinessResponse> {
+  return authSend<BusinessResponse>("/api/consultation/businesses", "POST", body);
+}
+export function getMyBusiness(id: number): Promise<BusinessResponse> {
+  return authGet<BusinessResponse>(`/api/consultation/businesses/${id}`);
+}
+export function updateBusiness(id: number, body: BusinessCreateRequest): Promise<BusinessResponse> {
+  return authSend<BusinessResponse>(`/api/consultation/businesses/${id}`, "PUT", body);
+}
+export function requestConsultation(businessId: number): Promise<void> {
+  return authSend<void>(`/api/consultation/businesses/${businessId}/request`, "POST");
+}
+export function listMessages(businessId: number): Promise<ConsultationMessageResponse[]> {
+  return authGet<ConsultationMessageResponse[]>(`/api/consultation/businesses/${businessId}/messages`);
+}
+export function postMessage(businessId: number, body: string): Promise<ConsultationMessageResponse> {
+  return authSend<ConsultationMessageResponse>(`/api/consultation/businesses/${businessId}/messages`, "POST", { body });
+}
+
+export type AdminBusinessFilters = { sector?: Sector; stage?: Stage; sort?: string; dir?: "asc" | "desc" };
+
+export function listAllBusinesses(filters: AdminBusinessFilters = {}): Promise<PageResponse<BusinessResponse>> {
+  const params = new URLSearchParams();
+  if (filters.sector) params.set("sector", filters.sector);
+  if (filters.stage) params.set("stage", filters.stage);
+  if (filters.sort) params.set("sort", filters.sort);
+  if (filters.dir) params.set("dir", filters.dir);
+  const qs = params.toString();
+  return authGet<PageResponse<BusinessResponse>>(`/api/admin/consultation/businesses${qs ? `?${qs}` : ""}`);
+}
+export function getAdminBusiness(id: number): Promise<BusinessResponse> {
+  return authGet<BusinessResponse>(`/api/admin/consultation/businesses/${id}`);
+}
+export function updateConsultationStatus(consultationId: number, status: ConsultationStatus): Promise<void> {
+  return authSend<void>(`/api/admin/consultation/${consultationId}/status`, "PATCH", { status });
+}
