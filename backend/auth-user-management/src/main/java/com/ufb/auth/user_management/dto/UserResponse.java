@@ -9,5 +9,6 @@ public record UserResponse(
         String fullName,
         Role role,
         boolean enabled,
-        Instant createdAt
+        Instant createdAt,
+        String profileImageUrl
 ) {}

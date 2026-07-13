@@ -3,6 +3,7 @@
 import { use, useCallback, useEffect, useState } from "react";
 import { currentUser, getAdminBusiness, updateConsultationStatus } from "@/lib/api";
 import ConsultationThread, { StatusBadge } from "@/components/ConsultationThread";
+import ConsultationStepper from "@/components/ConsultationStepper";
 import type { ApiError, BusinessResponse, ConsultationStatus } from "@/lib/api";
 
 const STATUS_ORDER: ConsultationStatus[] = ["PENDING", "IN_REVIEW", "ADVISED"];
@@ -71,7 +72,13 @@ export default function AdminBusinessDetailPage(props: PageProps<"/admin/consult
           {business.consultation && <StatusBadge status={business.consultation.status} />}
         </div>
         <h1 className="font-display text-4xl text-navy mb-1">{business.name}</h1>
-        <p className="text-sm text-mute mb-4">{business.ownerEmail}</p>
+        <p className="text-sm text-mute mb-5">{business.ownerEmail}</p>
+
+        {business.consultation && (
+          <div className="mb-5">
+            <ConsultationStepper status={business.consultation.status} />
+          </div>
+        )}
 
         {nextStatuses.length > 0 && (
           <div className="flex gap-2">

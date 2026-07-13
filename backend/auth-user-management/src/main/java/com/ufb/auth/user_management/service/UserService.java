@@ -28,4 +28,5 @@ public interface UserService {
     UserResponse setEnabled(Long userId, boolean enabled);
     void deleteUser(Long userId);
     UserResponse createAdmin(CreateAdminRequest request);
+    UserResponse updateProfilePhoto(String email, byte[] bytes, String contentType, String originalFilename);
 }

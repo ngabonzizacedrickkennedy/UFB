@@ -12,6 +12,7 @@ export type UserResponse = {
   role: "USER" | "ADMIN";
   enabled: boolean;
   createdAt: string;
+  profileImageUrl: string | null;
 };
 
 export type AuthResponse = {
@@ -41,7 +42,16 @@ function getRefresh(): string | null {
 function storeAuth(auth: AuthResponse) {
   localStorage.setItem(ACCESS_KEY, auth.accessToken);
   localStorage.setItem(REFRESH_KEY, auth.refreshToken);
-  localStorage.setItem(USER_KEY, JSON.stringify(auth.user));
+  setStoredUser(auth.user);
+}
+
+export const USER_EVENT = "ufb:user";
+
+function setStoredUser(user: UserResponse) {
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(USER_EVENT));
+  }
 }
 
 export function logout() {
@@ -139,6 +149,13 @@ export function resendVerification(email: string): Promise<{ message: string }> 
   return postPublic<{ message: string }>("/api/auth/resend-verification", { email });
 }
 
+function onSessionExpired() {
+  logout();
+  if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+    window.location.replace("/login?expired=1");
+  }
+}
+
 async function tryRefresh(): Promise<boolean> {
   const refreshToken = getRefresh();
   if (!refreshToken) return false;
@@ -156,13 +173,14 @@ async function authFetch(path: string, init: RequestInit, retry = true): Promise
   const token = getAccess();
   const headers = new Headers(init.headers);
   if (token) headers.set("Authorization", `Bearer ${token}`);
-  if (init.body) headers.set("Content-Type", "application/json");
+  if (init.body && !(init.body instanceof FormData)) headers.set("Content-Type", "application/json");
 
   const res = await fetch(path, { ...init, headers });
 
-  if (res.status === 401 && retry) {
+  if ((res.status === 401 || res.status === 403) && retry) {
     const refreshed = await tryRefresh();
     if (refreshed) return authFetch(path, init, false);
+    onSessionExpired();
   }
   return res;
 }
@@ -192,6 +210,66 @@ export function deleteUser(id: number): Promise<void> {
 }
 export function createAdmin(body: CreateAdminRequest): Promise<UserResponse> {
   return authSend<UserResponse>("/api/admin/admins", "POST", body);
+}
+
+export type HomeHero = {
+  kicker: string;
+  titleHtml: string;
+  lead: string;
+  primaryLabel: string;
+  primaryHref: string;
+  secondaryLabel: string;
+  secondaryHref: string;
+};
+export type HomeStat = { target: number; prefix: string; suffix: string; label: string };
+export type HomeSlide = { heading: string; text: string; imageUrl: string | null; bg: string };
+export type HomePost = { meta: string; title: string; excerpt: string; imageUrl: string | null; thumb: string; body: string[] };
+export type HomeContact = { email: string; phone: string; location: string; web: string };
+export type HomeSocial = { label: string; url: string; iconUrl: string | null };
+export type HomeData = { hero: HomeHero; stats: HomeStat[]; slides: HomeSlide[]; posts: HomePost[]; contact: HomeContact; socials: HomeSocial[] };
+export type HomeContentResponse = { version: number; status: string; data: HomeData };
+
+export async function getHome(): Promise<HomeContentResponse> {
+  return parse<HomeContentResponse>(await fetch("/api/home"));
+}
+export function getHomeDraft(): Promise<HomeContentResponse> {
+  return authGet<HomeContentResponse>("/api/home/draft");
+}
+export function saveHomeDraft(data: HomeData): Promise<HomeContentResponse> {
+  return authSend<HomeContentResponse>("/api/home/draft", "PUT", data);
+}
+export function publishHome(): Promise<HomeContentResponse> {
+  return authSend<HomeContentResponse>("/api/home/publish", "POST");
+}
+export async function uploadHomeMedia(file: File): Promise<string> {
+  const form = new FormData();
+  form.append("file", file);
+  const data = await parse<{ url: string }>(await authFetch("/api/home/media", { method: "POST", body: form }));
+  return data.url;
+}
+
+export type NotificationItem = {
+  id: number;
+  subject: string;
+  templateCode: string;
+  createdAt: string;
+  read: boolean;
+};
+export type NotificationFeed = { items: NotificationItem[]; unread: number };
+
+export function listNotifications(): Promise<NotificationFeed> {
+  return authGet<NotificationFeed>("/api/notifications");
+}
+export function markNotificationsRead(): Promise<{ marked: number }> {
+  return authSend<{ marked: number }>("/api/notifications/read", "POST");
+}
+
+export async function uploadProfilePhoto(file: File): Promise<UserResponse> {
+  const form = new FormData();
+  form.append("file", file);
+  const user = await parse<UserResponse>(await authFetch("/api/profile/photo", { method: "POST", body: form }));
+  setStoredUser(user);
+  return user;
 }
 
 // ---- consultation-service ----

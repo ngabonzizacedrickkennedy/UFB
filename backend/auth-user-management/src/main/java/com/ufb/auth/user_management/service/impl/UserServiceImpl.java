@@ -23,6 +23,8 @@ import com.ufb.auth.user_management.exception.UserNotFoundException;
 import com.ufb.auth.user_management.validation.EmailDomainValidator;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.UUID;
+import com.ufb.auth.user_management.service.StorageService;
 import com.ufb.auth.user_management.exception.InvalidClaimException;
 import com.ufb.auth.user_management.exception.InvalidTokenException;
 import com.ufb.auth.user_management.security.AccountVerificationNotifier;
@@ -58,6 +60,7 @@ public class UserServiceImpl implements UserService {
     private final AccountVerificationNotifier accountVerificationNotifier;
     private final TwoFactorCodeNotifier twoFactorCodeNotifier;
     private final EmailDomainValidator emailDomainValidator;
+    private final StorageService storageService;
 
     @Value("${ufb.admin.email}")
     private String bootstrapAdminEmail;
@@ -420,6 +423,32 @@ public class UserServiceImpl implements UserService {
         return toResponse(saved);
     }
 
+    @Override
+    @Transactional
+    public UserResponse updateProfilePhoto(String email, byte[] bytes, String contentType, String originalFilename) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(EmailNotRegisteredException::new);
+        String key = "profile-photos/" + user.getId() + "/" + UUID.randomUUID() + fileExtension(originalFilename, contentType);
+        storageService.upload(bytes, contentType, key);
+        user.setProfileImageKey(key);
+        User saved = userRepository.save(user);
+        eventPublisher.publishUpdated(saved);
+        return toResponse(saved);
+    }
+
+    private String fileExtension(String filename, String contentType) {
+        if (filename != null && filename.contains(".")) {
+            String ext = filename.substring(filename.lastIndexOf('.')).toLowerCase();
+            if (ext.length() <= 6) {
+                return ext;
+            }
+        }
+        if (contentType != null && contentType.contains("/")) {
+            return "." + contentType.substring(contentType.indexOf('/') + 1);
+        }
+        return "";
+    }
+
     private boolean constantTimeEquals(String a, String b) {
         if (a == null || b == null || a.length() != b.length()) {
             return false;
@@ -433,6 +462,7 @@ public class UserServiceImpl implements UserService {
 
     private UserResponse toResponse(User u) {
         return new UserResponse(u.getId(), u.getEmail(), u.getFullName(),
-                u.getRole(), u.isEnabled(), u.getCreatedAt());
+                u.getRole(), u.isEnabled(), u.getCreatedAt(),
+                storageService.presignedUrl(u.getProfileImageKey()));
     }
 }

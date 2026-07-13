@@ -2,65 +2,34 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { claimStatus, currentUser, logout, type UserResponse } from "@/lib/api";
+import { claimStatus, currentUser, getHome, logout, type HomeData, type HomePost, type UserResponse } from "@/lib/api";
+import { DEFAULT_HOME_DATA, normalizeHomeData } from "@/lib/home";
 import "./home.css";
 
-type Post = {
-  meta: string;
-  title: string;
-  excerpt: string;
-  thumb: string;
-  body: string[];
-};
+function isVideo(url: string): boolean {
+  return /\.(mp4|webm|mov|m4v)(\?|$)/i.test(url);
+}
 
-const SLIDES = [
-  { bg: "linear-gradient(135deg,#03122E,#0a2350)", h: "Advisory in action", p: "Sitting alongside founders to turn raw numbers into a clear plan." },
-  { bg: "linear-gradient(135deg,#0a2350,#A07C2C)", h: "Capital, unlocked", p: "Preparing women-led SMEs to meet investors with confidence." },
-  { bg: "linear-gradient(135deg,#A07C2C,#C9A65A)", h: "The Academy", p: "Workshops that build lasting financial capability across teams." },
-  { bg: "linear-gradient(135deg,#223247,#03122E)", h: "Across Africa", p: "Bridging expertise and ambition, one business at a time." },
-];
+function webHref(web: string): string {
+  return /^https?:\/\//i.test(web) ? web : "https://" + web;
+}
 
-const POSTS: Post[] = [
-  {
-    meta: "Funding · 5 min read",
-    title: "What investors really look for in African SMEs",
-    excerpt: "Beyond the pitch deck — the financial signals that move a “maybe” to a “yes”.",
-    thumb: "linear-gradient(135deg,#03122E,#0a2350)",
-    body: [
-      "Investors rarely decide on vision alone. Behind every funded business is a set of numbers that tells a credible, consistent story.",
-      "Clean books, a defensible model, and a clear view of unit economics do more to build confidence than any single slide ever could.",
-    ],
-  },
-  {
-    meta: "Strategy · 4 min read",
-    title: "From messy books to a live financial picture",
-    excerpt: "How disciplined bookkeeping quietly becomes a decision-making engine.",
-    thumb: "linear-gradient(135deg,#0a2350,#A07C2C)",
-    body: [
-      "Most founders treat bookkeeping as compliance. The ones who grow fastest treat it as instrumentation.",
-      "When your numbers are current and trusted, every decision — pricing, hiring, spending — gets sharper.",
-    ],
-  },
-  {
-    meta: "Growth · 6 min read",
-    title: "Building an investment-ready data room",
-    excerpt: "The documents and models that earn investor confidence fast.",
-    thumb: "linear-gradient(135deg,#A07C2C,#C9A65A)",
-    body: [
-      "A data room is where momentum is won or lost. Disorganisation reads as risk.",
-      "Prepare it before you need it: financials, model, cap table, and the narrative that ties them together.",
-    ],
-  },
-];
+function mediaStyle(url: string | null, fallback: string): React.CSSProperties {
+  if (url && !isVideo(url)) {
+    return { backgroundImage: `url(${url})`, backgroundSize: "cover", backgroundPosition: "center" };
+  }
+  return { background: fallback };
+}
 
 export default function Home() {
   const router = useRouter();
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [slide, setSlide] = useState(0);
-  const [openPost, setOpenPost] = useState<Post | null>(null);
+  const [openPost, setOpenPost] = useState<HomePost | null>(null);
   const [user, setUser] = useState<UserResponse | null>(null);
   const [needsClaim, setNeedsClaim] = useState(false);
+  const [content, setContent] = useState<HomeData>(DEFAULT_HOME_DATA);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -68,6 +37,9 @@ export default function Home() {
     claimStatus()
       .then((s) => setNeedsClaim(s.needsClaim))
       .catch(() => setNeedsClaim(false));
+    getHome()
+      .then((r) => setContent(normalizeHomeData(r.data)))
+      .catch(() => setContent(DEFAULT_HOME_DATA));
   }, []);
 
   const dashboardHref = user?.role === "ADMIN" ? "/admin" : "/portal";
@@ -101,7 +73,7 @@ export default function Home() {
       },
       { threshold: 0.15 }
     );
-    root.querySelectorAll<HTMLElement>(".reveal").forEach((el) => revObserver.observe(el));
+    root.querySelectorAll<HTMLElement>(".reveal:not(.in)").forEach((el) => revObserver.observe(el));
 
     const numObserver = new IntersectionObserver(
       (entries) => {
@@ -120,7 +92,7 @@ export default function Home() {
       revObserver.disconnect();
       numObserver.disconnect();
     };
-  }, []);
+  }, [content]);
 
   useEffect(() => {
     document.body.style.overflow = openPost ? "hidden" : "";
@@ -146,7 +118,7 @@ export default function Home() {
     const bodyText = encodeURIComponent(
       "Name: " + name + "\n" + "Email: " + email + "\n" + "Company: " + company + "\n\n" + msg
     );
-    window.location.href = "mailto:info@ufbconsulting.com?subject=" + subject + "&body=" + bodyText;
+    window.location.href = "mailto:" + content.contact.email + "?subject=" + subject + "&body=" + bodyText;
   };
 
   return (
@@ -224,12 +196,12 @@ export default function Home() {
           </g>
         </svg>
         <div className="wrap hero-in">
-          <span className="kicker">Unified Finance Bridge · Consulting</span>
-          <h1>Bridging finance to <em>growth</em> for Africa&rsquo;s ambitious businesses.</h1>
-          <p className="lead">A tech-native financial advisory firm helping growth-stage businesses turn numbers into clarity, foresight, and access to capital.</p>
+          <span className="kicker">{content.hero.kicker}</span>
+          <h1 dangerouslySetInnerHTML={{ __html: content.hero.titleHtml }} />
+          <p className="lead">{content.hero.lead}</p>
           <div className="btns">
-            <a href="#contact" className="btn-g">Start a Conversation</a>
-            <a href="#services" className="btn-o">Explore Services</a>
+            <a href={content.hero.primaryHref} className="btn-g">{content.hero.primaryLabel}</a>
+            <a href={content.hero.secondaryHref} className="btn-o">{content.hero.secondaryLabel}</a>
             {needsClaim && (
               <a href="/claim" className="btn-o">Claim Admin Account</a>
             )}
@@ -248,10 +220,12 @@ export default function Home() {
       <section className="stats" id="stats">
         <div className="wrap">
           <div className="stats-grid">
-            <div className="stat-item reveal"><div className="num" data-target="50" data-suffix="+">0</div><div className="lbl">Businesses supported</div></div>
-            <div className="stat-item reveal"><div className="num" data-prefix="$" data-target="12" data-suffix="M+">0</div><div className="lbl">Capital facilitated</div></div>
-            <div className="stat-item reveal"><div className="num" data-target="3" data-suffix="">0</div><div className="lbl">Service pillars</div></div>
-            <div className="stat-item reveal"><div className="num" data-target="100" data-suffix="%">0</div><div className="lbl">Founder-focused</div></div>
+            {content.stats.map((st, i) => (
+              <div className="stat-item reveal" key={i}>
+                <div className="num" data-target={String(st.target)} data-prefix={st.prefix} data-suffix={st.suffix}>0</div>
+                <div className="lbl">{st.label}</div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -316,18 +290,28 @@ export default function Home() {
           </div>
           <div className="carousel reveal">
             <div className="track" style={{ transform: `translateX(-${slide * 100}%)` }}>
-              {SLIDES.map((s, i) => (
-                <div className="slide" key={i} style={{ background: s.bg }}>
+              {content.slides.map((s, i) => (
+                <div className="slide" key={i} style={mediaStyle(s.imageUrl, s.bg)}>
+                  {s.imageUrl && isVideo(s.imageUrl) && (
+                    <video
+                      style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+                      src={s.imageUrl}
+                      autoPlay
+                      muted
+                      loop
+                      playsInline
+                    />
+                  )}
                   <div className="scrim"></div>
-                  <div className="caption"><h3>{s.h}</h3><p>{s.p}</p></div>
+                  <div className="caption"><h3>{s.heading}</h3><p>{s.text}</p></div>
                 </div>
               ))}
             </div>
-            <button className="car-btn car-prev" aria-label="Previous" onClick={() => setSlide((s) => (s - 1 + SLIDES.length) % SLIDES.length)}>&#10094;</button>
-            <button className="car-btn car-next" aria-label="Next" onClick={() => setSlide((s) => (s + 1) % SLIDES.length)}>&#10095;</button>
+            <button className="car-btn car-prev" aria-label="Previous" onClick={() => setSlide((s) => (s - 1 + content.slides.length) % content.slides.length)}>&#10094;</button>
+            <button className="car-btn car-next" aria-label="Next" onClick={() => setSlide((s) => (s + 1) % content.slides.length)}>&#10095;</button>
           </div>
           <div className="dots">
-            {SLIDES.map((_, i) => (
+            {content.slides.map((_, i) => (
               <button key={i} className={"dot" + (i === slide ? " active" : "")} aria-label={`Go to slide ${i + 1}`} onClick={() => setSlide(i)} />
             ))}
           </div>
@@ -360,9 +344,9 @@ export default function Home() {
             </div>
           </div>
           <div className="posts">
-            {POSTS.map((post, i) => (
+            {content.posts.map((post, i) => (
               <div className="post" key={i} onClick={() => setOpenPost(post)}>
-                <div className="thumb" style={{ background: post.thumb }}></div>
+                <div className="thumb" style={mediaStyle(post.imageUrl, post.thumb)}></div>
                 <div className="body">
                   <div className="meta">{post.meta}</div>
                   <h3>{post.title}</h3>
@@ -382,7 +366,7 @@ export default function Home() {
         {openPost && (
           <div className="modal-card">
             <button className="modal-close" aria-label="Close" onClick={() => setOpenPost(null)}>&times;</button>
-            <div className="hero-img" style={{ background: openPost.thumb }}></div>
+            <div className="hero-img" style={mediaStyle(openPost.imageUrl, openPost.thumb)}></div>
             <div className="inner">
               <div className="meta">{openPost.meta}</div>
               <h2>{openPost.title}</h2>
@@ -403,18 +387,51 @@ export default function Home() {
           </div>
           <div className="contact-grid">
             <div className="contact-info reveal">
-              <a className="ci" href="mailto:info@ufbconsulting.com">
-                <span className="ico">&#9993;</span><span><span className="lbl">Email</span><span className="val">info@ufbconsulting.com</span></span>
+              <a className="ci" href={`mailto:${content.contact.email}`}>
+                <span className="ico">&#9993;</span><span><span className="lbl">Email</span><span className="val">{content.contact.email}</span></span>
               </a>
-              <a className="ci" href="tel:+250781141576">
-                <span className="ico">&#9742;</span><span><span className="lbl">Phone</span><span className="val">+250 781 141 576</span></span>
+              <a className="ci" href={`tel:${content.contact.phone.replace(/\s+/g, "")}`}>
+                <span className="ico">&#9742;</span><span><span className="lbl">Phone</span><span className="val">{content.contact.phone}</span></span>
               </a>
               <div className="ci">
-                <span className="ico">&#9873;</span><span><span className="lbl">Location</span><span className="val">Kigali, Rwanda</span></span>
+                <span className="ico">&#9873;</span><span><span className="lbl">Location</span><span className="val">{content.contact.location}</span></span>
               </div>
-              <a className="ci" href="https://www.ufbconsulting.com">
-                <span className="ico">&#127760;</span><span><span className="lbl">Web</span><span className="val">www.ufbconsulting.com</span></span>
+              <a className="ci" href={webHref(content.contact.web)}>
+                <span className="ico">&#127760;</span><span><span className="lbl">Web</span><span className="val">{content.contact.web}</span></span>
               </a>
+
+              {content.socials.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", marginTop: "18px" }}>
+                  {content.socials.map((s, i) => (
+                    <a
+                      key={i}
+                      href={webHref(s.url)}
+                      target="_blank"
+                      rel="noreferrer"
+                      title={s.label}
+                      aria-label={s.label}
+                      style={{
+                        display: "grid",
+                        placeItems: "center",
+                        width: "46px",
+                        height: "46px",
+                        borderRadius: "50%",
+                        background: "#03122E",
+                        overflow: "hidden",
+                        border: "1px solid rgba(201,166,90,0.4)",
+                      }}
+                    >
+                      {s.iconUrl ? (
+                        <img src={s.iconUrl} alt={s.label} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      ) : (
+                        <span style={{ color: "#C9A65A", fontWeight: 700, fontSize: "14px" }}>
+                          {(s.label.trim()[0] ?? "?").toUpperCase()}
+                        </span>
+                      )}
+                    </a>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="form reveal">
               <div className="row"><label>Name</label><input id="fName" placeholder="Your name" /></div>
@@ -444,10 +461,10 @@ export default function Home() {
             </div>
             <div className="fcol">
               <h5>Contact</h5>
-              <p>info@ufbconsulting.com</p>
-              <p>www.ufbconsulting.com</p>
-              <p>+250 781 141 576</p>
-              <p>Kigali, Rwanda</p>
+              <p>{content.contact.email}</p>
+              <p>{content.contact.web}</p>
+              <p>{content.contact.phone}</p>
+              <p>{content.contact.location}</p>
             </div>
           </div>
           <div className="fbottom">

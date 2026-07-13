@@ -3,6 +3,7 @@
 import { use, useCallback, useEffect, useState } from "react";
 import BusinessForm from "@/components/BusinessForm";
 import ConsultationThread, { StatusBadge } from "@/components/ConsultationThread";
+import ConsultationStepper from "@/components/ConsultationStepper";
 import {
   currentUser, getMyBusiness, requestConsultation, updateBusiness,
   type ApiError, type BusinessCreateRequest, type BusinessResponse,
@@ -67,6 +68,13 @@ export default function BusinessDetailPage(props: PageProps<"/portal/businesses/
           {business.consultation && <StatusBadge status={business.consultation.status} />}
         </div>
         <h1 className="font-display text-4xl text-navy mb-4">{business.name}</h1>
+
+        {business.consultation && (
+          <div className="mb-5">
+            <ConsultationStepper status={business.consultation.status} />
+          </div>
+        )}
+
         <button
           onClick={askForConsultation}
           disabled={requesting}

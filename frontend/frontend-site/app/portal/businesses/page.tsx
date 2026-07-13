@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { StatusBadge } from "@/components/ConsultationThread";
+import BusinessCard from "@/components/BusinessCard";
 import { listMyBusinesses, type ApiError, type BusinessResponse } from "@/lib/api";
 
 export default function MyBusinessesPage() {
@@ -53,22 +53,9 @@ export default function MyBusinessesPage() {
           </Link>
         </div>
       ) : (
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {businesses.map((b) => (
-            <Link
-              key={b.id}
-              href={`/portal/businesses/${b.id}`}
-              className="bg-white border border-line rounded-lg p-6 hover:border-gold transition block"
-            >
-              <div className="flex items-start justify-between gap-3 mb-2">
-                <h3 className="font-display text-xl text-navy">{b.name}</h3>
-                {b.consultation && <StatusBadge status={b.consultation.status} />}
-              </div>
-              <p className="text-xs uppercase tracking-wide text-mute mb-3">
-                {b.sector.replace(/_/g, " ")} · {b.stage}
-              </p>
-              <p className="text-sm text-char line-clamp-2">{b.description}</p>
-            </Link>
+            <BusinessCard key={b.id} business={b} href={`/portal/businesses/${b.id}`} />
           ))}
         </div>
       )}

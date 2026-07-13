@@ -86,6 +86,9 @@ public class User {
     @Column(name = "two_factor_code_expires_at")
     private Instant twoFactorCodeExpiresAt;
 
+    @Column(name = "profile_image_key")
+    private String profileImageKey;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

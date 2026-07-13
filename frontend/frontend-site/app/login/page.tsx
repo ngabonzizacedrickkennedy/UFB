@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { checkEmailDeliverable, loginUser, resendVerification, type ApiError, type AuthResponse } from "@/lib/api";
@@ -13,7 +13,12 @@ export default function LoginPage() {
   const [showPw, setShowPw] = useState(false);
   const [emailStatus, setEmailStatus] = useState<"idle" | "checking" | "ok" | "invalid">("idle");
   const [resent, setResent] = useState(false);
+  const [sessionExpired, setSessionExpired] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    setSessionExpired(new URLSearchParams(window.location.search).get("expired") === "1");
+  }, []);
 
   const update = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm({ ...form, [k]: e.target.value });
@@ -86,6 +91,12 @@ export default function LoginPage() {
         <div className="w-full max-w-md">
           <p className="text-gold-dark uppercase tracking-[4px] text-xs mb-3 font-semibold">Sign in</p>
           <h2 className="font-display text-3xl text-navy mb-8">Access your portal</h2>
+
+          {sessionExpired && !auth && (
+            <div className="mb-6 border-l-2 border-gold bg-gold/10 px-4 py-3 text-sm text-char">
+              Your session expired. Please sign in again to continue.
+            </div>
+          )}
 
           {auth ? (
             <div className="border border-line bg-white rounded-md p-6">

@@ -1,48 +1,23 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
-import Sidebar from "@/components/Sidebar";
-import { currentUser, logout } from "@/lib/api";
+import DashboardHeader from "@/components/DashboardHeader";
+import Sidebar, { type SidebarLink } from "@/components/Sidebar";
 
-const PORTAL_LINKS = [
-  { href: "/portal", label: "Dashboard" },
-  { href: "/portal/businesses", label: "My Businesses" },
-  { href: "/portal/consultations", label: "Consultations" },
+const PORTAL_LINKS: SidebarLink[] = [
+  { href: "/portal", label: "Dashboard", icon: "dashboard" },
+  { href: "/portal/businesses", label: "My Businesses", icon: "business" },
+  { href: "/portal/consultations", label: "Consultations", icon: "consult" },
 ];
 
 function PortalChrome({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
-  const user = currentUser();
-
-  const signOut = () => {
-    logout();
-    router.replace("/login");
-  };
-
   return (
-    <div className="min-h-screen bg-ivory flex flex-col">
-      <header className="bg-navy text-white">
-        <div className="max-w-6xl mx-auto px-8 py-5 flex items-center justify-between">
-          <Link href="/" className="font-display text-2xl text-gold tracking-wide">UFB</Link>
-          <div className="flex items-center gap-6">
-            <Link href="/" className="text-sm text-[#c7d0de] hover:text-gold">Home</Link>
-            <span className="text-sm text-[#c7d0de] hidden sm:inline">{user?.fullName}</span>
-            <button
-              onClick={signOut}
-              className="text-sm border border-gold/50 text-gold px-4 py-2 rounded-sm transition hover:bg-gold hover:text-navy"
-            >
-              Sign out
-            </button>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-ivory flex flex-col md:pl-56">
+      <Sidebar links={PORTAL_LINKS} title="UFB" subtitle="Client Portal" />
 
-      <div className="flex flex-1 max-w-6xl w-full mx-auto">
-        <Sidebar links={PORTAL_LINKS} />
-        <main className="flex-1 min-w-0">{children}</main>
-      </div>
+      <DashboardHeader brand="UFB" />
+
+      <main className="flex-1 min-w-0 max-w-6xl w-full mx-auto">{children}</main>
     </div>
   );
 }
