@@ -6,6 +6,7 @@ const NOTIFICATION = process.env.NOTIFICATION_SERVICE_URL || "https://notificati
 const HOME = process.env.HOME_SERVICE_URL || "https://home-controller-8t7q.onrender.com";
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   async rewrites() {
     return [
       {
