@@ -1,27 +1,20 @@
 package com.ufb.auth.user_management.security;
 
-import jakarta.mail.MessagingException;
-import jakarta.mail.internet.MimeMessage;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Component;
 
 @Component
 public class EmailClaimTokenNotifier implements ClaimTokenNotifier {
 
-    private final JavaMailSender mailSender;
-
-    @Value("${ufb.mail.from}")
-    private String fromAddress;
+    private final EmailGateway emailGateway;
 
     @Value("${ufb.frontend.base-url}")
     private String frontendBaseUrl;
 
-    public EmailClaimTokenNotifier(JavaMailSender mailSender) {
-        this.mailSender = mailSender;
+    public EmailClaimTokenNotifier(EmailGateway emailGateway) {
+        this.emailGateway = emailGateway;
     }
 
     @Override
@@ -34,17 +27,6 @@ public class EmailClaimTokenNotifier implements ClaimTokenNotifier {
                 frontendBaseUrl + "/claim",
                 "This token is single-use and expires at " + expiresAt + "."
         );
-
-        try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, "UTF-8");
-            helper.setFrom(fromAddress);
-            helper.setTo(recipientEmail);
-            helper.setSubject("UFB Consulting — Claim your admin account");
-            helper.setText(html, true);
-            mailSender.send(message);
-        } catch (MessagingException e) {
-            throw new IllegalStateException("Failed to send claim token email", e);
-        }
+        emailGateway.sendHtml(recipientEmail, "UFB Consulting — Claim your admin account", html);
     }
 }

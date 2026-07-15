@@ -58,9 +58,14 @@ public class DataInitializer implements ApplicationRunner {
 
         userRepository.save(admin);
 
-        claimTokenNotifier.deliver(adminEmail, rawToken, expiresAt);
-
-        log.info("Seeded unclaimed admin account: {} (claim within {} hours)",
-                adminEmail, claimTokenExpiryHours);
+        try {
+            claimTokenNotifier.deliver(adminEmail, rawToken, expiresAt);
+            log.info("Seeded unclaimed admin account: {} (claim within {} hours)",
+                    adminEmail, claimTokenExpiryHours);
+        } catch (Exception ex) {
+            log.warn("Seeded admin {} but the claim email could not be sent ({}). "
+                            + "Claim manually within {} hours using this one-time token: {}",
+                    adminEmail, ex.getMessage(), claimTokenExpiryHours, rawToken);
+        }
     }
 }

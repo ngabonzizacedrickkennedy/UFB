@@ -1,6 +1,8 @@
-package com.ufb.notification_service.service;
+package com.ufb.auth.user_management.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -14,8 +16,9 @@ import java.util.List;
 import java.util.Map;
 
 @Component
-public class EmailSender {
+public class EmailGateway {
 
+    private static final Logger log = LoggerFactory.getLogger(EmailGateway.class);
     private static final String ENDPOINT = "https://api.resend.com/emails";
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -27,9 +30,9 @@ public class EmailSender {
     @Value("${RESEND_API_KEY:}")
     private String apiKey;
 
-    public void send(String to, String subject, String html) {
+    public void sendHtml(String to, String subject, String html) {
         if (apiKey == null || apiKey.isBlank()) {
-            throw new RuntimeException("RESEND_API_KEY is not set");
+            throw new IllegalStateException("RESEND_API_KEY is not set");
         }
         try {
             String payload = MAPPER.writeValueAsString(Map.of(
@@ -46,13 +49,14 @@ public class EmailSender {
 
             HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() >= 300) {
-                throw new RuntimeException("Resend responded " + response.statusCode() + ": " + response.body());
+                throw new IllegalStateException("Resend responded " + response.statusCode() + ": " + response.body());
             }
+            log.info("Sent email to {} via Resend", to);
         } catch (IOException ex) {
-            throw new RuntimeException("Failed to send email to " + to + ": " + ex.getMessage(), ex);
+            throw new IllegalStateException("Failed to send email to " + to, ex);
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
-            throw new RuntimeException("Interrupted while sending email to " + to, ex);
+            throw new IllegalStateException("Interrupted while sending email to " + to, ex);
         }
     }
 }
