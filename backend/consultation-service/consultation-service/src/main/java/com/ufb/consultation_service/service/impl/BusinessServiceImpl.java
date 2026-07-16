@@ -14,6 +14,9 @@ import com.ufb.consultation_service.repository.BusinessRepository;
 import com.ufb.consultation_service.repository.ConsultationRepository;
 import com.ufb.consultation_service.service.BusinessService;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -80,8 +83,10 @@ public class BusinessServiceImpl implements BusinessService {
     @Override
     @Transactional(readOnly = true)
     public List<BusinessResponse> listForOwner(String ownerEmail) {
-        return businessRepository.findByOwnerEmail(ownerEmail).stream()
-                .map(b -> toResponse(b, consultationRepository.findByBusinessId(b.getId()).orElse(null)))
+        List<Business> businesses = businessRepository.findByOwnerEmail(ownerEmail);
+        Map<Long, Consultation> byBusinessId = consultationsByBusinessId(businesses);
+        return businesses.stream()
+                .map(b -> toResponse(b, byBusinessId.get(b.getId())))
                 .toList();
     }
 
@@ -96,8 +101,9 @@ public class BusinessServiceImpl implements BusinessService {
     @Override
     @Transactional(readOnly = true)
     public Page<BusinessResponse> listForAdmin(Sector sector, Stage stage, Pageable pageable) {
-        return businessRepository.findForAdmin(sector, stage, pageable)
-                .map(b -> toResponse(b, consultationRepository.findByBusinessId(b.getId()).orElse(null)));
+        Page<Business> page = businessRepository.findForAdmin(sector, stage, pageable);
+        Map<Long, Consultation> byBusinessId = consultationsByBusinessId(page.getContent());
+        return page.map(b -> toResponse(b, byBusinessId.get(b.getId())));
     }
 
     @Override
@@ -106,6 +112,15 @@ public class BusinessServiceImpl implements BusinessService {
         Business business = businessRepository.findById(id)
                 .orElseThrow(BusinessNotFoundException::new);
         return toResponse(business, consultationRepository.findByBusinessId(business.getId()).orElse(null));
+    }
+
+    private Map<Long, Consultation> consultationsByBusinessId(List<Business> businesses) {
+        if (businesses.isEmpty()) {
+            return Map.of();
+        }
+        List<Long> ids = businesses.stream().map(Business::getId).toList();
+        return consultationRepository.findByBusinessIdIn(ids).stream()
+                .collect(Collectors.toMap(c -> c.getBusiness().getId(), Function.identity(), (a, b) -> a));
     }
 
     private BusinessResponse toResponse(Business b, Consultation c) {
