@@ -3,12 +3,15 @@
 import { useRouter } from "next/navigation";
 import BusinessForm from "@/components/BusinessForm";
 import { createBusiness, type BusinessCreateRequest } from "@/lib/api";
+import { useToast } from "@/lib/toast";
 
 export default function NewBusinessPage() {
   const router = useRouter();
+  const toast = useToast();
 
   const submit = async (body: BusinessCreateRequest) => {
     const created = await createBusiness(body);
+    toast.success("Business created.");
     router.push(`/portal/businesses/${created.id}`);
   };
 

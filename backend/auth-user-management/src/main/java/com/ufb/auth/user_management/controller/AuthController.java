@@ -68,6 +68,12 @@ public class AuthController {
         return ResponseEntity.ok(new ClaimStatusResponse(userService.bootstrapAdminNeedsClaim()));
     }
 
+    @PostMapping("/claim/resend")
+    public ResponseEntity<Map<String, String>> resendClaim() {
+        userService.resendClaimToken();
+        return ResponseEntity.ok(Map.of("message", "If an admin account still needs claiming, a fresh token has been emailed."));
+    }
+
     @PostMapping("/forgot-password")
     public ResponseEntity<Map<String, String>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
         userService.forgotPassword(request.email());

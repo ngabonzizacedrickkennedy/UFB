@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { resendVerification, verifyEmail, type ApiError } from "@/lib/api";
+import { useToast } from "@/lib/toast";
+import AuthBackdrop from "@/components/AuthBackdrop";
 
 export default function VerifyEmailForm() {
   const router = useRouter();
@@ -17,6 +19,7 @@ export default function VerifyEmailForm() {
   );
   const [error, setError] = useState<ApiError | null>(null);
   const [resent, setResent] = useState(false);
+  const toast = useToast();
 
   const submit = async (email: string, verificationToken: string) => {
     setStatus("verifying");
@@ -24,12 +27,15 @@ export default function VerifyEmailForm() {
     try {
       const auth = await verifyEmail({ email, verificationToken });
       setStatus("done");
+      toast.success("Email verified.");
       setTimeout(() => {
         router.push(auth.user.role === "ADMIN" ? "/admin" : "/portal");
       }, 1200);
     } catch (err) {
-      setError(err as ApiError);
+      const e = err as ApiError;
+      setError(e);
       setStatus("error");
+      toast.error(e.message ?? "Verification failed.");
     }
   };
 
@@ -44,6 +50,7 @@ export default function VerifyEmailForm() {
     if (!form.email) return;
     try {
       await resendVerification(form.email);
+      toast.success("If that email needs verification, a new link is on its way.");
     } finally {
       setResent(true);
     }
@@ -54,7 +61,8 @@ export default function VerifyEmailForm() {
 
   return (
     <main className="min-h-screen grid lg:grid-cols-2">
-      <section className="hidden lg:flex flex-col justify-between bg-navy text-white p-14">
+      <section className="relative isolate overflow-hidden hidden lg:flex flex-col justify-between bg-navy text-white p-14">
+        <AuthBackdrop />
         <Link href="/" className="font-display text-2xl text-gold tracking-wide">UFB</Link>
         <div>
           <p className="text-gold uppercase tracking-[5px] text-xs mb-6">Unified Finance Bridge</p>

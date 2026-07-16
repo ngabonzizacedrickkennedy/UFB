@@ -20,6 +20,7 @@ public interface UserService {
     AuthResponse refresh(String refreshToken);
     AuthResponse claim(ClaimAccountRequest request);
     boolean bootstrapAdminNeedsClaim();
+    void resendClaimToken();
     void forgotPassword(String email);
     AuthResponse resetPassword(ResetPasswordRequest request);
     AuthResponse verifyEmail(VerifyEmailRequest request);

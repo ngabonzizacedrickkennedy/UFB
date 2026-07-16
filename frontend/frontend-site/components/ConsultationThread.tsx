@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listMessages, postMessage, type ApiError, type ConsultationMessageResponse } from "@/lib/api";
+import { useToast } from "@/lib/toast";
 
 export function StatusBadge({ status }: { status: "PENDING" | "IN_REVIEW" | "ADVISED" }) {
   const styles: Record<string, string> = {
@@ -28,6 +29,7 @@ export default function ConsultationThread({ businessId, viewerEmail }: { busine
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+  const toast = useToast();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -57,8 +59,11 @@ export default function ConsultationThread({ businessId, viewerEmail }: { busine
       const message = await postMessage(businessId, draft.trim());
       setMessages((prev) => [...prev, message]);
       setDraft("");
+      toast.success("Message sent.");
     } catch (err) {
-      setError((err as ApiError).message ?? "Failed to send message");
+      const msg = (err as ApiError).message ?? "Failed to send message";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSending(false);
     }

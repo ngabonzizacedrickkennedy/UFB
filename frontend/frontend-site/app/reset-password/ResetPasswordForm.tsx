@@ -4,6 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { resetPassword, type ApiError } from "@/lib/api";
+import { useToast } from "@/lib/toast";
+import AuthBackdrop from "@/components/AuthBackdrop";
 
 export default function ResetPasswordForm() {
   const router = useRouter();
@@ -19,6 +21,7 @@ export default function ResetPasswordForm() {
   const [localError, setLocalError] = useState<string | null>(null);
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const toast = useToast();
 
   const update = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm({ ...form, [k]: e.target.value });
@@ -39,9 +42,12 @@ export default function ResetPasswordForm() {
     setLoading(true);
     try {
       const auth = await resetPassword(form);
+      toast.success("Password reset — you're signed in.");
       router.push(auth.user.role === "ADMIN" ? "/admin" : "/portal");
     } catch (err) {
-      setError(err as ApiError);
+      const e = err as ApiError;
+      setError(e);
+      if (!e.fields) toast.error(e.message ?? "Could not reset password.");
     } finally {
       setLoading(false);
     }
@@ -49,7 +55,8 @@ export default function ResetPasswordForm() {
 
   return (
     <main className="min-h-screen grid lg:grid-cols-2">
-      <section className="hidden lg:flex flex-col justify-between bg-navy text-white p-14">
+      <section className="relative isolate overflow-hidden hidden lg:flex flex-col justify-between bg-navy text-white p-14">
+        <AuthBackdrop />
         <Link href="/" className="font-display text-2xl text-gold tracking-wide">UFB</Link>
         <div>
           <p className="text-gold uppercase tracking-[5px] text-xs mb-6">Unified Finance Bridge</p>

@@ -7,9 +7,11 @@ import {
   type UserResponse, type ApiError,
 } from "@/lib/api";
 import Avatar from "@/components/Avatar";
+import { useToast } from "@/lib/toast";
 
 export default function AdminUsersPage() {
   const me = currentUser();
+  const toast = useToast();
 
   const [users, setUsers] = useState<UserResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,8 +45,11 @@ export default function AdminUsersPage() {
     try {
       const updated = u.enabled ? await disableUser(u.id) : await enableUser(u.id);
       setUsers((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+      toast.success(`${updated.fullName} ${updated.enabled ? "enabled" : "disabled"}.`);
     } catch (err) {
-      setError((err as ApiError).message ?? "Action failed");
+      const msg = (err as ApiError).message ?? "Action failed";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setBusyId(null);
     }
@@ -57,8 +62,11 @@ export default function AdminUsersPage() {
     try {
       await deleteUser(u.id);
       setUsers((prev) => prev.filter((x) => x.id !== u.id));
+      toast.success(`${u.email} deleted.`);
     } catch (err) {
-      setError((err as ApiError).message ?? "Delete failed");
+      const msg = (err as ApiError).message ?? "Delete failed";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setBusyId(null);
     }
@@ -72,8 +80,11 @@ export default function AdminUsersPage() {
       setUsers((prev) => [...prev, created]);
       setForm({ fullName: "", email: "", password: "" });
       setShowForm(false);
+      toast.success(`Admin ${created.email} created.`);
     } catch (err) {
-      setFormError(err as ApiError);
+      const e = err as ApiError;
+      setFormError(e);
+      if (!e.fields) toast.error(e.message ?? "Could not create admin.");
     } finally {
       setCreating(false);
     }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Cinzel, Montserrat } from "next/font/google";
 import "./globals.css";
+import { ToastProvider } from "@/lib/toast";
 
 const cinzel = Cinzel({
   variable: "--font-cinzel",
@@ -28,7 +29,9 @@ export default function RootLayout({
       lang="en"
       className={`${cinzel.variable} ${montserrat.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <ToastProvider>{children}</ToastProvider>
+      </body>
     </html>
   );
 }

@@ -6,6 +6,7 @@ import {
   type ApiError, type HomeData,
 } from "@/lib/api";
 import { normalizeHomeData } from "@/lib/home";
+import { useToast } from "@/lib/toast";
 
 const INPUT = "w-full border border-line bg-white rounded-sm px-3 py-2 text-sm text-char outline-none focus:border-gold";
 const LABEL = "block text-xs uppercase tracking-wide text-mute mb-1";
@@ -18,6 +19,7 @@ export default function AdminHomePage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState<number>(0);
+  const toast = useToast();
 
   useEffect(() => {
     (async () => {
@@ -44,8 +46,11 @@ export default function AdminHomePage() {
       const res = await saveHomeDraft(content);
       setVersion(res.version);
       setMessage("Draft saved.");
+      toast.success("Draft saved.");
     } catch (err) {
-      setError((err as ApiError).message ?? "Save failed");
+      const msg = (err as ApiError).message ?? "Save failed";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
@@ -62,8 +67,11 @@ export default function AdminHomePage() {
       const res = await publishHome();
       setVersion(res.version);
       setMessage(`Published live — version ${res.version}.`);
+      toast.success(`Published live — version ${res.version}.`);
     } catch (err) {
-      setError((err as ApiError).message ?? "Publish failed");
+      const msg = (err as ApiError).message ?? "Publish failed";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setPublishing(false);
     }
@@ -120,7 +128,28 @@ export default function AdminHomePage() {
             <Field label="Secondary button label" value={content.hero.secondaryLabel} onChange={(v) => patch((c) => ({ ...c, hero: { ...c.hero, secondaryLabel: v } }))} />
             <Field label="Secondary button link" value={content.hero.secondaryHref} onChange={(v) => patch((c) => ({ ...c, hero: { ...c.hero, secondaryHref: v } }))} />
           </div>
+          <div>
+            <label className={LABEL}>Hero background (image or video — plays behind the headline)</label>
+            <MediaField
+              url={content.hero.backgroundUrl}
+              fallback="linear-gradient(135deg,#03122E,#0a2350)"
+              onUploaded={(url) => patch((c) => ({ ...c, hero: { ...c.hero, backgroundUrl: url } }))}
+              onClear={() => patch((c) => ({ ...c, hero: { ...c.hero, backgroundUrl: null } }))}
+              onError={setError}
+            />
+          </div>
         </div>
+      </Card>
+
+      <Card title="Auth pages background">
+        <p className="mb-3 text-sm text-mute">Image or video shown behind the navy panel on the sign in, register, claim, and password pages.</p>
+        <MediaField
+          url={content.authBackgroundUrl}
+          fallback="linear-gradient(135deg,#03122E,#0a2350)"
+          onUploaded={(url) => patch((c) => ({ ...c, authBackgroundUrl: url }))}
+          onClear={() => patch((c) => ({ ...c, authBackgroundUrl: null }))}
+          onError={setError}
+        />
       </Card>
 
       <Card title="Stats" onAdd={() => patch((c) => ({ ...c, stats: [...c.stats, { target: 0, prefix: "", suffix: "", label: "New stat" }] }))}>

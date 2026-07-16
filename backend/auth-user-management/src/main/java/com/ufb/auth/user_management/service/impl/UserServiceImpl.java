@@ -28,6 +28,7 @@ import com.ufb.auth.user_management.service.StorageService;
 import com.ufb.auth.user_management.exception.InvalidClaimException;
 import com.ufb.auth.user_management.exception.InvalidTokenException;
 import com.ufb.auth.user_management.security.AccountVerificationNotifier;
+import com.ufb.auth.user_management.security.ClaimTokenNotifier;
 import com.ufb.auth.user_management.security.OneTimeTokens;
 import com.ufb.auth.user_management.security.PasswordResetNotifier;
 import com.ufb.auth.user_management.security.TokenHasher;
@@ -43,6 +44,8 @@ import com.ufb.auth.user_management.event.UserEventPublisher;
 import com.ufb.auth.user_management.security.JwtService;
 import com.ufb.auth.user_management.service.UserService;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -52,18 +55,24 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
 
+    private static final Logger log = LoggerFactory.getLogger(UserServiceImpl.class);
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final UserEventPublisher eventPublisher;
     private final PasswordResetNotifier passwordResetNotifier;
     private final AccountVerificationNotifier accountVerificationNotifier;
+    private final ClaimTokenNotifier claimTokenNotifier;
     private final TwoFactorCodeNotifier twoFactorCodeNotifier;
     private final EmailDomainValidator emailDomainValidator;
     private final StorageService storageService;
 
     @Value("${ufb.admin.email}")
     private String bootstrapAdminEmail;
+
+    @Value("${ufb.admin.claim-token-expiry-hours}")
+    private long claimTokenExpiryHours;
 
     @Value("${ufb.password-reset.expiry-hours}")
     private long resetTokenExpiryHours;
@@ -269,6 +278,28 @@ public class UserServiceImpl implements UserService {
         return userRepository.findByEmail(bootstrapAdminEmail)
                 .map(u -> !u.isPasswordSet())
                 .orElse(false);
+    }
+
+    @Override
+    @Transactional
+    public void resendClaimToken() {
+        userRepository.findByEmail(bootstrapAdminEmail).ifPresent(user -> {
+            if (user.isPasswordSet()) {
+                return;
+            }
+            String rawToken = OneTimeTokens.generate();
+            Instant expiresAt = Instant.now().plus(claimTokenExpiryHours, ChronoUnit.HOURS);
+            user.setClaimTokenHash(TokenHasher.sha256(rawToken));
+            user.setClaimTokenExpiresAt(expiresAt);
+            userRepository.save(user);
+            try {
+                claimTokenNotifier.deliver(user.getEmail(), rawToken, expiresAt);
+            } catch (Exception ex) {
+                log.warn("Regenerated admin claim token for {} but the email could not be sent ({}). "
+                                + "Claim manually before {} using this one-time token: {}",
+                        user.getEmail(), ex.getMessage(), expiresAt, rawToken);
+            }
+        });
     }
 
     @Override

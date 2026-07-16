@@ -3,6 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { checkEmailDeliverable, registerUser, resendVerification, type ApiError } from "@/lib/api";
+import { useToast } from "@/lib/toast";
+import AuthBackdrop from "@/components/AuthBackdrop";
 
 export default function RegisterPage() {
   const [form, setForm] = useState({ fullName: "", email: "", password: "" });
@@ -11,6 +13,7 @@ export default function RegisterPage() {
   const [emailStatus, setEmailStatus] = useState<"idle" | "checking" | "ok" | "invalid">("idle");
   const [submitted, setSubmitted] = useState(false);
   const [resent, setResent] = useState(false);
+  const toast = useToast();
 
   const update = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm({ ...form, [k]: e.target.value });
@@ -36,8 +39,11 @@ export default function RegisterPage() {
     try {
       await registerUser(form);
       setSubmitted(true);
+      toast.success("Account created — check your email to verify.");
     } catch (err) {
-      setError(err as ApiError);
+      const e = err as ApiError;
+      setError(e);
+      if (!e.fields) toast.error(e.message ?? "Registration failed.");
     } finally {
       setLoading(false);
     }
@@ -46,6 +52,7 @@ export default function RegisterPage() {
   const resend = async () => {
     try {
       await resendVerification(form.email);
+      toast.success("A new link is on its way.");
     } finally {
       setResent(true);
     }
@@ -53,7 +60,8 @@ export default function RegisterPage() {
 
   return (
     <main className="min-h-screen grid lg:grid-cols-2">
-      <section className="hidden lg:flex flex-col justify-between bg-navy text-white p-14">
+      <section className="relative isolate overflow-hidden hidden lg:flex flex-col justify-between bg-navy text-white p-14">
+        <AuthBackdrop />
         <Link href="/" className="font-display text-2xl text-gold tracking-wide">UFB</Link>
         <div>
           <p className="text-gold uppercase tracking-[5px] text-xs mb-6">

@@ -3,12 +3,15 @@
 import { useState } from "react";
 import Link from "next/link";
 import { forgotPassword, type ApiError } from "@/lib/api";
+import { useToast } from "@/lib/toast";
+import AuthBackdrop from "@/components/AuthBackdrop";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
   const [sent, setSent] = useState(false);
+  const toast = useToast();
 
   const submit = async () => {
     setLoading(true);
@@ -16,8 +19,11 @@ export default function ForgotPasswordPage() {
     try {
       await forgotPassword(email);
       setSent(true);
+      toast.success("If that account exists, a reset link has been sent.");
     } catch (err) {
-      setError(err as ApiError);
+      const e = err as ApiError;
+      setError(e);
+      if (!e.fields) toast.error(e.message ?? "Could not send reset link.");
     } finally {
       setLoading(false);
     }
@@ -25,7 +31,8 @@ export default function ForgotPasswordPage() {
 
   return (
     <main className="min-h-screen grid lg:grid-cols-2">
-      <section className="hidden lg:flex flex-col justify-between bg-navy text-white p-14">
+      <section className="relative isolate overflow-hidden hidden lg:flex flex-col justify-between bg-navy text-white p-14">
+        <AuthBackdrop />
         <Link href="/" className="font-display text-2xl text-gold tracking-wide">UFB</Link>
         <div>
           <p className="text-gold uppercase tracking-[5px] text-xs mb-6">Unified Finance Bridge</p>

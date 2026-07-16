@@ -4,6 +4,7 @@ import { use, useCallback, useEffect, useState } from "react";
 import { currentUser, getAdminBusiness, updateConsultationStatus } from "@/lib/api";
 import ConsultationThread, { StatusBadge } from "@/components/ConsultationThread";
 import ConsultationStepper from "@/components/ConsultationStepper";
+import { useToast } from "@/lib/toast";
 import type { ApiError, BusinessResponse, ConsultationStatus } from "@/lib/api";
 
 const STATUS_ORDER: ConsultationStatus[] = ["PENDING", "IN_REVIEW", "ADVISED"];
@@ -22,6 +23,7 @@ export default function AdminBusinessDetailPage(props: PageProps<"/admin/consult
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [updating, setUpdating] = useState(false);
+  const toast = useToast();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -45,9 +47,12 @@ export default function AdminBusinessDetailPage(props: PageProps<"/admin/consult
     setError(null);
     try {
       await updateConsultationStatus(business.consultation.id, status);
+      toast.success(`Marked ${STATUS_LABELS[status]}.`);
       await load();
     } catch (err) {
-      setError((err as ApiError).message ?? "Failed to update status");
+      const msg = (err as ApiError).message ?? "Failed to update status";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setUpdating(false);
     }

@@ -123,6 +123,10 @@ export async function claimStatus(): Promise<ClaimStatusResponse> {
   return parse<ClaimStatusResponse>(await fetch("/api/auth/claim-status"));
 }
 
+export function resendClaimToken(): Promise<{ message: string }> {
+  return postPublic<{ message: string }>("/api/auth/claim/resend", {});
+}
+
 export function forgotPassword(email: string): Promise<{ message: string }> {
   return postPublic<{ message: string }>("/api/auth/forgot-password", { email });
 }
@@ -220,13 +224,14 @@ export type HomeHero = {
   primaryHref: string;
   secondaryLabel: string;
   secondaryHref: string;
+  backgroundUrl: string | null;
 };
 export type HomeStat = { target: number; prefix: string; suffix: string; label: string };
 export type HomeSlide = { heading: string; text: string; imageUrl: string | null; bg: string };
 export type HomePost = { meta: string; title: string; excerpt: string; imageUrl: string | null; thumb: string; body: string[] };
 export type HomeContact = { email: string; phone: string; location: string; web: string };
 export type HomeSocial = { label: string; url: string; iconUrl: string | null };
-export type HomeData = { hero: HomeHero; stats: HomeStat[]; slides: HomeSlide[]; posts: HomePost[]; contact: HomeContact; socials: HomeSocial[] };
+export type HomeData = { hero: HomeHero; stats: HomeStat[]; slides: HomeSlide[]; posts: HomePost[]; contact: HomeContact; socials: HomeSocial[]; authBackgroundUrl: string | null };
 export type HomeContentResponse = { version: number; status: string; data: HomeData };
 
 export async function getHome(): Promise<HomeContentResponse> {

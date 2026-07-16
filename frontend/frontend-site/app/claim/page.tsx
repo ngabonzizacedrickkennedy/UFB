@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { claimAccount, currentUser, isLoggedIn, type ApiError } from "@/lib/api";
+import { claimAccount, currentUser, isLoggedIn, resendClaimToken, type ApiError } from "@/lib/api";
+import { useToast } from "@/lib/toast";
+import AuthBackdrop from "@/components/AuthBackdrop";
 
 export default function ClaimPage() {
   const router = useRouter();
@@ -15,6 +17,8 @@ export default function ClaimPage() {
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [checking, setChecking] = useState(true);
+  const [resending, setResending] = useState(false);
+  const toast = useToast();
 
   useEffect(() => {
     if (isLoggedIn()) {
@@ -44,15 +48,30 @@ export default function ClaimPage() {
     setLoading(true);
     try {
       const auth = await claimAccount(form);
+      toast.success("Account claimed — welcome.");
       if (auth.user.role === "ADMIN") {
         router.push("/admin");
       } else {
         router.push("/portal");
       }
     } catch (err) {
-      setError(err as ApiError);
+      const e = err as ApiError;
+      setError(e);
+      if (!e.fields) toast.error(e.message ?? "Could not claim the account.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const requestNewToken = async () => {
+    setResending(true);
+    try {
+      await resendClaimToken();
+      toast.success("A fresh token has been emailed to the admin inbox.");
+    } catch {
+      toast.error("Could not send a new token. Please try again.");
+    } finally {
+      setResending(false);
     }
   };
 
@@ -69,7 +88,8 @@ export default function ClaimPage() {
 
   return (
     <main className="min-h-screen grid lg:grid-cols-2">
-      <section className="hidden lg:flex flex-col justify-between bg-navy text-white p-14">
+      <section className="relative isolate overflow-hidden hidden lg:flex flex-col justify-between bg-navy text-white p-14">
+        <AuthBackdrop />
         <Link href="/" className="font-display text-2xl text-gold tracking-wide">UFB</Link>
         <div>
           <p className="text-gold uppercase tracking-[5px] text-xs mb-6">Unified Finance Bridge</p>
@@ -163,6 +183,18 @@ export default function ClaimPage() {
             >
               {loading ? "Activating…" : "Claim account"}
             </button>
+
+            <p className="text-sm text-mute text-center">
+              Didn&rsquo;t get a token?{" "}
+              <button
+                type="button"
+                onClick={requestNewToken}
+                disabled={resending}
+                className="text-gold-dark font-semibold disabled:opacity-60"
+              >
+                {resending ? "Sending…" : "Generate another token"}
+              </button>
+            </p>
 
             <p className="text-sm text-mute text-center">
               Already activated?{" "}

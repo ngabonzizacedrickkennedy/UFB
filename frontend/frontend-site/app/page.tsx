@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { claimStatus, currentUser, getHome, logout, type HomeData, type HomePost, type UserResponse } from "@/lib/api";
 import { DEFAULT_HOME_DATA, normalizeHomeData } from "@/lib/home";
+import { useToast } from "@/lib/toast";
 import "./home.css";
 
 function isVideo(url: string): boolean {
@@ -23,6 +24,7 @@ function mediaStyle(url: string | null, fallback: string): React.CSSProperties {
 
 export default function Home() {
   const router = useRouter();
+  const toast = useToast();
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [slide, setSlide] = useState(0);
@@ -47,6 +49,7 @@ export default function Home() {
   const signOut = () => {
     logout();
     setUser(null);
+    toast.success("You've been logged out.");
     router.refresh();
   };
 
@@ -182,6 +185,16 @@ export default function Home() {
       </div>
 
       <section className="hero" id="top">
+        {content.hero.backgroundUrl && (
+          <div className="hero-media" aria-hidden="true">
+            {isVideo(content.hero.backgroundUrl) ? (
+              <video src={content.hero.backgroundUrl} autoPlay muted loop playsInline />
+            ) : (
+              <div className="hero-media-img" style={{ backgroundImage: `url(${content.hero.backgroundUrl})` }} />
+            )}
+            <div className="hero-media-scrim"></div>
+          </div>
+        )}
         <div className="ring r1"></div>
         <div className="ring r2"></div>
         <svg className="bridge" viewBox="0 0 1200 160" preserveAspectRatio="none" aria-hidden="true">

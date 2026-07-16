@@ -5,6 +5,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { logout, uploadProfilePhoto, type ApiError } from "@/lib/api";
 import { roleLabel, useUser } from "@/lib/useUser";
+import { useToast } from "@/lib/toast";
 import Avatar from "./Avatar";
 import NotificationBell from "./NotificationBell";
 
@@ -14,9 +15,11 @@ export default function DashboardHeader({ brand }: { brand: string }) {
   const fileInput = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
 
   const signOut = () => {
     logout();
+    toast.success("You've been logged out.");
     router.replace("/login");
   };
 
@@ -30,8 +33,11 @@ export default function DashboardHeader({ brand }: { brand: string }) {
     setUploading(true);
     try {
       await uploadProfilePhoto(file);
+      toast.success("Profile photo updated.");
     } catch (err) {
-      setError((err as ApiError).message ?? "Upload failed");
+      const msg = (err as ApiError).message ?? "Upload failed";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setUploading(false);
     }

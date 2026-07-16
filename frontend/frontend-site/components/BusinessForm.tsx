@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { SECTORS, STAGES, type ApiError, type BusinessCreateRequest } from "@/lib/api";
+import { useToast } from "@/lib/toast";
 
 const SELECT_CLASS = "w-full border border-line bg-white rounded-sm px-4 py-3 text-char outline-none focus:border-gold";
 const INPUT_CLASS = "w-full border border-line bg-white rounded-sm px-4 py-3 text-char outline-none focus:border-gold";
@@ -21,6 +22,7 @@ export default function BusinessForm({
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
+  const toast = useToast();
 
   const submit = async () => {
     setSaving(true);
@@ -28,7 +30,9 @@ export default function BusinessForm({
     try {
       await onSubmit(form);
     } catch (err) {
-      setError(err as ApiError);
+      const e = err as ApiError;
+      setError(e);
+      if (!e.fields) toast.error(e.message ?? "Something went wrong.");
     } finally {
       setSaving(false);
     }

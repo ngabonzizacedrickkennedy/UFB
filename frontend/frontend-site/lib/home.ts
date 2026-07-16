@@ -9,6 +9,7 @@ export const DEFAULT_HOME_DATA: HomeData = {
     primaryHref: "#contact",
     secondaryLabel: "Explore Services",
     secondaryHref: "#services",
+    backgroundUrl: null,
   },
   stats: [
     { target: 50, prefix: "", suffix: "+", label: "Businesses supported" },
@@ -64,6 +65,7 @@ export const DEFAULT_HOME_DATA: HomeData = {
     web: "www.ufbconsulting.com",
   },
   socials: [],
+  authBackgroundUrl: null,
 };
 
 export function normalizeHomeData(raw: unknown): HomeData {
@@ -86,5 +88,6 @@ export function normalizeHomeData(raw: unknown): HomeData {
     posts: Array.isArray(d.posts) ? d.posts : DEFAULT_HOME_DATA.posts,
     contact: { ...DEFAULT_HOME_DATA.contact, ...(d.contact && typeof d.contact === "object" ? d.contact : {}) },
     socials: Array.isArray(d.socials) ? d.socials : DEFAULT_HOME_DATA.socials,
+    authBackgroundUrl: typeof d.authBackgroundUrl === "string" ? d.authBackgroundUrl : DEFAULT_HOME_DATA.authBackgroundUrl,
   };
 }

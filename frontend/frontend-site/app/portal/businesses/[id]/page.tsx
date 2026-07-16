@@ -8,6 +8,7 @@ import {
   currentUser, getMyBusiness, requestConsultation, updateBusiness,
   type ApiError, type BusinessCreateRequest, type BusinessResponse,
 } from "@/lib/api";
+import { useToast } from "@/lib/toast";
 
 export default function BusinessDetailPage(props: PageProps<"/portal/businesses/[id]">) {
   const { id } = use(props.params);
@@ -19,6 +20,7 @@ export default function BusinessDetailPage(props: PageProps<"/portal/businesses/
   const [error, setError] = useState<string | null>(null);
   const [requesting, setRequesting] = useState(false);
   const [requested, setRequested] = useState(false);
+  const toast = useToast();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -39,6 +41,7 @@ export default function BusinessDetailPage(props: PageProps<"/portal/businesses/
   const save = async (body: BusinessCreateRequest) => {
     const updated = await updateBusiness(businessId, body);
     setBusiness(updated);
+    toast.success("Business updated.");
   };
 
   const askForConsultation = async () => {
@@ -46,7 +49,10 @@ export default function BusinessDetailPage(props: PageProps<"/portal/businesses/
     try {
       await requestConsultation(businessId);
       setRequested(true);
+      toast.success("Consultation requested.");
       await load();
+    } catch (err) {
+      toast.error((err as ApiError).message ?? "Could not request consultation.");
     } finally {
       setRequesting(false);
     }

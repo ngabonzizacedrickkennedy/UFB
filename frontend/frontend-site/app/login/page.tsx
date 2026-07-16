@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { checkEmailDeliverable, loginUser, resendVerification, type ApiError, type AuthResponse } from "@/lib/api";
+import { useToast } from "@/lib/toast";
+import AuthBackdrop from "@/components/AuthBackdrop";
 
 export default function LoginPage() {
   const [form, setForm] = useState({ email: "", password: "" });
@@ -15,6 +17,7 @@ export default function LoginPage() {
   const [resent, setResent] = useState(false);
   const [sessionExpired, setSessionExpired] = useState(false);
   const router = useRouter();
+  const toast = useToast();
 
   useEffect(() => {
     setSessionExpired(new URLSearchParams(window.location.search).get("expired") === "1");
@@ -45,14 +48,18 @@ export default function LoginPage() {
     try {
       const result = await loginUser(form);
       if (result.twoFactorRequired) {
+        toast.info("We sent a verification code to your email.");
         router.push(`/verify-2fa?email=${encodeURIComponent(form.email)}`);
         return;
       }
       const auth = result.auth!;
       setAuth(auth);
+      toast.success(`Welcome back, ${auth.user.fullName.split(" ")[0]}.`);
       router.replace(auth.user.role === "ADMIN" ? "/admin" : "/portal");
     } catch (err) {
-      setError(err as ApiError);
+      const e = err as ApiError;
+      setError(e);
+      if (!e.fields) toast.error(e.message ?? "Sign in failed.");
     } finally {
       setLoading(false);
     }
@@ -61,6 +68,7 @@ export default function LoginPage() {
   const resend = async () => {
     try {
       await resendVerification(form.email);
+      toast.success("A new verification link is on its way.");
     } finally {
       setResent(true);
     }
@@ -73,7 +81,8 @@ export default function LoginPage() {
 
   return (
     <main className="min-h-screen grid lg:grid-cols-2">
-      <section className="hidden lg:flex flex-col justify-between bg-navy text-white p-14">
+      <section className="relative isolate overflow-hidden hidden lg:flex flex-col justify-between bg-navy text-white p-14">
+        <AuthBackdrop />
         <Link href="/" className="font-display text-2xl text-gold tracking-wide">UFB</Link>
         <div>
           <p className="text-gold uppercase tracking-[5px] text-xs mb-6">Unified Finance Bridge</p>
