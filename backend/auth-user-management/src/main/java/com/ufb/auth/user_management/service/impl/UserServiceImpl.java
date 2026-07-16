@@ -283,23 +283,32 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public void resendClaimToken() {
-        userRepository.findByEmail(bootstrapAdminEmail).ifPresent(user -> {
-            if (user.isPasswordSet()) {
-                return;
-            }
-            String rawToken = OneTimeTokens.generate();
-            Instant expiresAt = Instant.now().plus(claimTokenExpiryHours, ChronoUnit.HOURS);
-            user.setClaimTokenHash(TokenHasher.sha256(rawToken));
-            user.setClaimTokenExpiresAt(expiresAt);
-            userRepository.save(user);
-            try {
-                claimTokenNotifier.deliver(user.getEmail(), rawToken, expiresAt);
-            } catch (Exception ex) {
-                log.warn("Regenerated admin claim token for {} but the email could not be sent ({}). "
-                                + "Claim manually before {} using this one-time token: {}",
-                        user.getEmail(), ex.getMessage(), expiresAt, rawToken);
-            }
-        });
+        User admin = userRepository.findByEmail(bootstrapAdminEmail).orElse(null);
+        if (admin == null) {
+            log.warn("Claim-token resend requested but no admin account exists for {}. Check the UFB_ADMIN_EMAIL setting.",
+                    bootstrapAdminEmail);
+            return;
+        }
+        if (admin.isPasswordSet()) {
+            log.info("Claim-token resend requested for {} but the account is already claimed; no token sent. "
+                    + "Use Sign in or Forgot password instead.", bootstrapAdminEmail);
+            return;
+        }
+
+        String rawToken = OneTimeTokens.generate();
+        Instant expiresAt = Instant.now().plus(claimTokenExpiryHours, ChronoUnit.HOURS);
+        admin.setClaimTokenHash(TokenHasher.sha256(rawToken));
+        admin.setClaimTokenExpiresAt(expiresAt);
+        userRepository.save(admin);
+
+        log.info("ADMIN CLAIM TOKEN for {} (expires {}): {}", admin.getEmail(), expiresAt, rawToken);
+
+        try {
+            claimTokenNotifier.deliver(admin.getEmail(), rawToken, expiresAt);
+        } catch (Exception ex) {
+            log.warn("Claim token email to {} could not be sent ({}); use the token logged above.",
+                    admin.getEmail(), ex.getMessage());
+        }
     }
 
     @Override
