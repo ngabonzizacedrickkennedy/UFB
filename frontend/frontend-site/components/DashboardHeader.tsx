@@ -8,6 +8,7 @@ import { roleLabel, useUser } from "@/lib/useUser";
 import { useToast } from "@/lib/toast";
 import Avatar from "./Avatar";
 import NotificationBell from "./NotificationBell";
+import ThemeToggle from "./ThemeToggle";
 
 export default function DashboardHeader({ brand }: { brand: string }) {
   const router = useRouter();
@@ -56,6 +57,8 @@ export default function DashboardHeader({ brand }: { brand: string }) {
             <HomeIcon />
             <span className="hidden sm:inline">Home</span>
           </Link>
+
+          <ThemeToggle />
 
           <NotificationBell />
 

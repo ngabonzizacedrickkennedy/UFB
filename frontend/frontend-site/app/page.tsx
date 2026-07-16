@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { claimStatus, currentUser, getHome, logout, type HomeData, type HomePost, type UserResponse } from "@/lib/api";
 import { DEFAULT_HOME_DATA, normalizeHomeData } from "@/lib/home";
 import { useToast } from "@/lib/toast";
+import ThemeToggle from "@/components/ThemeToggle";
 import "./home.css";
 
 function isVideo(url: string): boolean {
@@ -139,6 +140,7 @@ export default function Home() {
             <a href="#contact">Contact</a>
           </nav>
           <div className="auth-nav">
+            <ThemeToggle />
             {user ? (
               <>
                 <span className="auth-hello">Hi, {user.fullName.split(" ")[0]}</span>
@@ -165,6 +167,7 @@ export default function Home() {
       </header>
 
       <div className={"mobile-menu" + (menuOpen ? " open" : "")}>
+        <ThemeToggle className="inline-grid h-11 w-11 place-items-center rounded-full border border-white/25 text-white/85 transition hover:border-gold/60 hover:text-gold" />
         <a href="#about" onClick={closeMenu}>About</a>
         <a href="#services" onClick={closeMenu}>Services</a>
         <a href="#work" onClick={closeMenu}>Work</a>
