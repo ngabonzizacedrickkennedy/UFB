@@ -26,7 +26,7 @@ export default function AuthBackdrop() {
       ) : (
         <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${url})` }} />
       )}
-      <div className="absolute inset-0 bg-navy/80" />
+      <div className="absolute inset-0 bg-navy/50" />
     </div>
   );
 }
