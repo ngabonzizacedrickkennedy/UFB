@@ -18,20 +18,20 @@ const nextConfig: NextConfig = {
         destination: `${AUTH}/api/profile/:path*`,
       },
       {
-        source: "/api/notifications/:path*",
-        destination: `${NOTIFICATION}/api/notifications/:path*`,
-      },
-      {
         source: "/api/notifications",
         destination: `${NOTIFICATION}/api/notifications`,
       },
       {
-        source: "/api/home/:path*",
-        destination: `${HOME}/api/home/:path*`,
+        source: "/api/notifications/:path*",
+        destination: `${NOTIFICATION}/api/notifications/:path*`,
       },
       {
         source: "/api/home",
         destination: `${HOME}/api/home`,
+      },
+      {
+        source: "/api/home/:path*",
+        destination: `${HOME}/api/home/:path*`,
       },
       {
         source: "/api/admin/consultation/:path*",
